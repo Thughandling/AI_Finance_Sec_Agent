@@ -1,0 +1,16 @@
+{
+  "version": "2026-08-03",
+  "purpose": "결정론적 탐지기와 RAG 회귀평가용 합성 검증셋",
+  "classification_metrics": ["macro_f1", "fraud_recall", "false_positive_rate", "precision"],
+  "ragas_metrics": ["faithfulness", "answer_relevancy", "context_precision", "context_recall"],
+  "cases": [
+    { "text": "검찰 수사관입니다. 안전계좌로 지금 즉시 이체하세요.", "label": "fraud" },
+    { "text": "대출 수수료를 지정 계좌에 오늘 안에 보내주세요.", "label": "fraud" },
+    { "text": "따님이 사고를 당했으니 현금을 직원에게 전달하세요.", "label": "fraud" },
+    { "text": "링크를 눌러 원격제어 앱을 설치하세요.", "label": "fraud" },
+    { "text": "제가 요청한 대출 상담이고 지금 송금할 필요는 없습니다.", "label": "normal" },
+    { "text": "공식 앱에서 금리와 수수료를 확인했습니다.", "label": "normal" },
+    { "text": "가족에게 생활비를 송금했어요.", "label": "normal" },
+    { "text": "상담을 원하지 않으면 대표번호로 다시 연락해주세요.", "label": "normal" }
+  ]
+}
