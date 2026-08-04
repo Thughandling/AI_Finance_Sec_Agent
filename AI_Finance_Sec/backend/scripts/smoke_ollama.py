@@ -26,6 +26,7 @@ REQUIRED_TRACE = {
 
 def sanitise(payload: dict) -> dict:
     documents = payload.get("documents") or []
+    checks = payload.get("safety", {}).get("checks", {})
     return {
         "session_id": payload.get("session_id"),
         "turn_count": payload.get("turn_count"),
@@ -43,6 +44,11 @@ def sanitise(payload: dict) -> dict:
         "safety": {
             "passed": payload.get("safety", {}).get("passed"),
             "initial_passed": payload.get("safety", {}).get("initial_passed"),
+        },
+        "required_actions": {
+            "police_112": checks.get("post_transfer_police_112"),
+            "financial_company": checks.get("post_transfer_financial_company"),
+            "payment_stop": checks.get("post_transfer_payment_stop"),
         },
         "trace": payload.get("trace"),
     }
@@ -71,6 +77,17 @@ def main() -> None:
             assert payload["safety"]["passed"] is True, payload
             turns.append({"request": {"message": prompt}, "response": sanitise(payload)})
 
+        victim_response = client.post(
+            f"{BASE_URL}/api/chat",
+            json={"message": "이미 송금했습니다. 무엇부터 해야 하나요?", "session_id": f"{session_id}-victim"},
+        )
+        victim_response.raise_for_status()
+        victim_payload = victim_response.json()
+        victim_result = sanitise(victim_payload)
+        assert victim_payload["risk"]["already_transferred"] is True, victim_payload
+        assert victim_payload["safety"]["passed"] is True, victim_payload
+        assert all(victim_result["required_actions"].values()), victim_payload
+
     result = {
         "generated_at_utc": generated_at.isoformat(),
         "environment": {
@@ -84,8 +101,12 @@ def main() -> None:
             "uvicorn backend.main:app --host 127.0.0.1 --port 8000",
             "backend/.venv/bin/python backend/scripts/smoke_ollama.py",
         ],
-        "assertions": "same session, qwen2.5:7b, fallback=false, turn 1->2, safety passed, required trace",
+        "assertions": "same session 2-turn fallback=false and full trace; victim final safety has 112+financial company+payment stop",
         "turns": turns,
+        "victim_case": {
+            "request": {"message": "이미 송금했습니다. 무엇부터 해야 하나요?"},
+            "response": victim_result,
+        },
     }
     print(json.dumps(result, ensure_ascii=False, indent=2))
 

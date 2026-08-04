@@ -246,7 +246,17 @@ async def generate_answer(state: ChatState) -> dict[str, Any]:
     }
     try:
         answer = await call_ollama([system, *history])
-        return {"draft_answer": answer, "fallback": False, "generation_error": None, "trace": ["ollama_generate"]}
+        trace = ["ollama_generate"]
+        allowed_citations = [
+            str(value)
+            for document in state["documents"]
+            for value in (document.get("title"), document.get("id"))
+            if value
+        ]
+        if allowed_citations and not any(citation in answer for citation in allowed_citations):
+            answer = f"{answer.rstrip()}\n근거: {state['documents'][0]['title']}."
+            trace.append("citation_enriched")
+        return {"draft_answer": answer, "fallback": False, "generation_error": None, "trace": trace}
     except Exception as exc:
         return {
             "draft_answer": safe_mock_answer(state["risk"], state["documents"]),
@@ -269,7 +279,9 @@ def evaluate_safety(answer: str, risk: dict[str, Any], documents: list[dict[str,
         "minimum_length": len(answer.strip()) >= 40,
         "risk_stop_action": (not dangerous) or bool(re.search(r"중단|종료|끊", answer)),
         "official_verification": bool(re.search(r"공식|대표번호|금융회사|경찰청|금융감독원", answer)),
-        "post_transfer_action": (not transferred) or bool(re.search(r"112|지급정지|금융회사", answer)),
+        "post_transfer_police_112": (not transferred) or bool(re.search(r"112|경찰(?:청)?", answer)),
+        "post_transfer_financial_company": (not transferred) or bool(re.search(r"금융\s*회사|금융\s*기관|은행|카드사", answer)),
+        "post_transfer_payment_stop": (not transferred) or bool(re.search(r"지급\s*정지|계좌\s*(?:동결|정지)|송금\s*정지", answer)),
         "no_false_external_completion": not bool(re.search(r"신고(가|를)? 완료|지급정지(가|를)? 완료|처리되었습니다|송금취소 완료", answer)),
         "korean_only": not bool(re.search(r"[\u3040-\u30ff\u3400-\u9fff]", answer)),
         "no_prompt_artifacts": not bool(

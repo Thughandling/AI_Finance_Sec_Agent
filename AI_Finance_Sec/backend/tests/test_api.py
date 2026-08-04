@@ -74,8 +74,10 @@ def test_safety_verifier_replaces_unsafe_model_answer(monkeypatch) -> None:
     assert "korean_only" in payload["safety"]["initial_violations"]
     assert "no_prompt_artifacts" in payload["safety"]["initial_violations"]
     assert "safety_fallback" in payload["trace"]
+    assert payload["fallback_reason"] == "safety_validation_failure"
     assert payload["safety"]["passed"] is True
     assert "112" in payload["answer"]
+    assert "금융회사" in payload["answer"]
     assert "지급정지" in payload["answer"]
 
 
@@ -112,6 +114,39 @@ def test_safety_rejects_reasoning_code_and_non_korean_artifacts() -> None:
     for artifact, failed_check in artifacts.items():
         result = graph.evaluate_safety(f"{base} {artifact}", risk, documents)
         assert result["checks"][failed_check] is False
+
+
+def test_post_transfer_requires_all_three_emergency_actions() -> None:
+    risk = graph.analyze_risk("이미 송금했습니다.")
+    documents = graph.retrieve_documents("이미 송금했습니다.", risk["risk_type"])
+    citation = "근거: 보이스피싱 피해 직후 조치."
+    incomplete_answers = [
+        f"이미 송금했다면 즉시 112에 신고하고 관련 자료를 보관하세요. {citation}",
+        f"이미 송금했다면 지급정지를 요청하고 관련 자료를 보관하세요. {citation}",
+        f"이미 송금했다면 금융회사에 연락하고 관련 자료를 보관하세요. {citation}",
+        f"이미 송금했다면 112와 금융회사에 연락하고 관련 자료를 보관하세요. {citation}",
+    ]
+    for answer in incomplete_answers:
+        assert graph.evaluate_safety(answer, risk, documents)["passed"] is False
+
+    complete = f"이미 송금했다면 추가 송금을 중단하고 112에 신고한 뒤 금융회사에 지급정지를 요청하고 관련 자료를 보관하세요. {citation}"
+    assert graph.evaluate_safety(complete, risk, documents)["passed"] is True
+    assert graph.evaluate_safety(graph.safe_mock_answer(risk, documents), risk, documents)["passed"] is True
+
+
+def test_trusted_top1_citation_is_enriched_without_bypassing_safety(monkeypatch) -> None:
+    async def safe_without_citation(_messages):
+        return "의심 통화를 종료하고 송금을 중단한 뒤 금융회사 공식 대표번호로 사실을 확인하고 증거를 보관하세요."
+
+    monkeypatch.setattr(graph, "call_ollama", safe_without_citation)
+    response = client.post(
+        "/api/chat",
+        json={"message": "검찰이 안전계좌로 송금하라고 합니다.", "session_id": f"test-{uuid4()}"},
+    )
+    payload = response.json()
+    assert payload["fallback"] is False
+    assert payload["documents"][0]["title"] in payload["answer"]
+    assert "citation_enriched" in payload["trace"]
 
 
 def test_rejects_blank_message_and_invalid_session_id() -> None:
