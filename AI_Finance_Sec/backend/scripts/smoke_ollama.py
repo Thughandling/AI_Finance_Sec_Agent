@@ -116,8 +116,10 @@ def main() -> None:
         normal_result = sanitise(normal_payload)
         assert normal_payload["risk"]["verdict"] == "정상", normal_payload
         assert normal_payload["llm_invoked"] is True, normal_payload
-        assert normal_payload["policy_guardrail_applied"] is False, normal_payload
-        assert normal_payload["response_mode"] in {"llm_verified", "mock_fallback"}, normal_payload
+        assert normal_payload["fallback"] is False, normal_payload
+        assert normal_payload["policy_guardrail_applied"] is True, normal_payload
+        assert normal_payload["response_mode"] == "guarded_policy", normal_payload
+        assert "policy_guardrail" in normal_payload["trace"], normal_payload
         assert normal_payload["safety"]["passed"] is True, normal_payload
 
     result = {
@@ -133,7 +135,7 @@ def main() -> None:
             f"uvicorn backend.main:app --host 127.0.0.1 --port {api_port}",
             smoke_command,
         ],
-        "assertions": "risky 2-turn and victim use guarded_policy with Qwen invoked, policy guardrail, fallback=false; victim has 112+financial company+payment stop",
+        "assertions": "risky 2-turn, victim, and normal all use guarded_policy with Qwen invoked, policy guardrail, fallback=false; victim has 112+financial company+payment stop",
         "turns": turns,
         "victim_case": {
             "request": {"message": "이미 송금했습니다. 무엇부터 해야 하나요?"},

@@ -25,15 +25,15 @@ backend/.venv/bin/python backend/scripts/smoke_ollama.py
 
 - 모델 `qwen2.5:7b`
 - 두 응답 모두 `fallback=false`
-- 위험·피해 응답 `response_mode=guarded_policy`
+- 정상·위험·피해 응답 `response_mode=guarded_policy`
 - `llm_invoked=true`, `policy_guardrail_applied=true`
 - `turn_count` 1 → 2
 - Safety 통과
 - 위험행동 권고 없음 규칙 통과
 - 필수 LangGraph trace 전체 포함
 - 피해발생 최종 답변의 `112`, `금융회사`, `지급정지` 의미가 모두 존재
-- 정상 입력은 `llm_verified` 또는 검증 실패 시 `mock_fallback`
+- 정상 입력도 Qwen 원문 대신 `guarded_policy` 응답 사용
 
 ## 보존 결과
 
-`actual_ollama_smoke_2026-08-04.json`은 2026-08-04 실제 실행 stdout을 구조화하고 민감정보를 제거한 결과입니다. API 키와 모델 원문 답변은 저장하지 않았습니다. 두 번째 짧은 질문에서도 첫 번째 턴의 기관사칭 위험과 검색 근거가 유지됩니다. 위험·피해 사례는 Qwen을 실제 호출하지만 원문을 노출하지 않고 서버 허용행동으로 구성한 `guarded_policy`를 반환하며, 이는 호출 실패 폴백이 아닙니다.
+`actual_ollama_smoke_2026-08-04.json`은 2026-08-04 실제 실행 stdout을 구조화하고 민감정보를 제거한 결과입니다. API 키와 모델 원문 답변은 저장하지 않았습니다. 두 번째 짧은 질문에서도 첫 번째 턴의 기관사칭 위험과 검색 근거가 유지됩니다. 모든 판정은 Qwen을 실제 호출하지만 자유문을 노출하지 않고 서버 허용행동으로 구성한 `guarded_policy`를 반환하며, 이는 호출 실패 폴백이 아닙니다.

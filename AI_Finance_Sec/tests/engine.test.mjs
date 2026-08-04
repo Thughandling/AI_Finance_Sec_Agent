@@ -62,7 +62,7 @@ test("renders actual graph state from the FastAPI response and resets local sess
   assert.match(page, /data-testid="actual-safety-detail"/);
   assert.match(page, /규칙 기반 Safety 검사/);
   assert.match(page, /서버가 선택한 검색 근거/);
-  assert.match(page, /정책 보호 응답\(Qwen 분석 \+ 서버 허용행동\)/);
+  assert.match(page, /Qwen 로컬 호출 확인 \+ 서버 정책 엔진 응답/);
   assert.match(page, /response_mode/);
   assert.match(page, /policy_guardrail_applied/);
   assert.match(page, /llm_invoked/);
@@ -79,4 +79,14 @@ test("distinguishes local Qwen from Qwen Cloud and times out cloud providers", a
   assert.match(engineSource, /Ollama Local/);
   assert.match(route, /CLOUD_TIMEOUT_MS/);
   assert.ok((route.match(/AbortSignal\.timeout\(CLOUD_TIMEOUT_MS\)/g) ?? []).length >= 4);
+});
+
+test("does not expose a verified raw LLM response mode in product code", async () => {
+  const [page, graph, readme] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../backend/app/graph.py", import.meta.url), "utf8"),
+    readFile(new URL("../README.md", import.meta.url), "utf8"),
+  ]);
+  assert.doesNotMatch(`${page}\n${graph}\n${readme}`, /llm_verified/);
+  assert.match(page, /Qwen 로컬 호출 확인 \+ 서버 정책 엔진 응답/);
 });

@@ -158,7 +158,7 @@ def retrieve_documents(query: str, risk_type: str) -> list[dict[str, Any]]:
 
 
 def recommend_policy(risk: dict[str, Any]) -> dict[str, Any]:
-    actions = ["공식 대표번호·앱에서 사실 확인"]
+    actions = ["새로운 송금·앱 설치 요구 시 중단", "공식 대표번호·앱에서 사실 확인", "불필요한 개인정보 제공 금지"]
     if risk["verdict"] == "사기":
         actions = ["통화 즉시 종료", "추가 송금·앱 설치 중단", "통화·문자·계좌 증거 보관", *actions]
     if risk["level"] == "위험" or risk["already_transferred"]:
@@ -173,6 +173,8 @@ POLICY_ACTION_ALLOWLIST = (
     "공식 대표번호·앱에서 사실 확인",
     "112 상담·신고",
     "금융회사 콜센터에 지급정지 요청",
+    "새로운 송금·앱 설치 요구 시 중단",
+    "불필요한 개인정보 제공 금지",
 )
 
 
@@ -181,8 +183,13 @@ def guarded_policy_answer(risk: dict[str, Any], policy: dict[str, Any], document
     if not allowed_actions:
         allowed_actions = ["공식 대표번호·앱에서 사실 확인"]
     action_lines = "\n".join(f"- {action}" for action in allowed_actions)
+    summary = (
+        f"서버 위험 판정: {risk['level']} · {risk['risk_type']}."
+        if risk["verdict"] == "사기"
+        else "서버 위험 판정: 안전 · 강한 사기 징후 없음."
+    )
     return (
-        f"서버 위험 판정: {risk['level']} · {risk['risk_type']}.\n"
+        f"{summary}\n"
         f"허용된 사용자 행동:\n{action_lines}\n"
         f"서버가 선택한 검색 근거 {len(documents)}건은 별도 패널에서 확인하세요. "
         "실제 신고나 지급정지는 사용자가 직접 요청해야 합니다."
@@ -270,38 +277,15 @@ async def generate_answer(state: ChatState) -> dict[str, Any]:
     try:
         answer = await call_ollama([system, *history])
         initial = evaluate_safety(answer, state["risk"], state["documents"])
-        guarded = state["risk"]["verdict"] == "사기" or state["risk"]["already_transferred"]
-        if guarded:
-            return {
-                "draft_answer": guarded_policy_answer(state["risk"], state["policy"], state["documents"]),
-                "initial_safety": initial,
-                "fallback": False,
-                "response_mode": "guarded_policy",
-                "llm_invoked": True,
-                "policy_guardrail_applied": True,
-                "generation_error": None,
-                "trace": ["ollama_generate", "policy_guardrail"],
-            }
-        if initial["passed"]:
-            return {
-                "draft_answer": answer,
-                "initial_safety": initial,
-                "fallback": False,
-                "response_mode": "llm_verified",
-                "llm_invoked": True,
-                "policy_guardrail_applied": False,
-                "generation_error": None,
-                "trace": ["ollama_generate", "llm_verified"],
-            }
         return {
-            "draft_answer": safe_mock_answer(state["risk"], state["documents"]),
+            "draft_answer": guarded_policy_answer(state["risk"], state["policy"], state["documents"]),
             "initial_safety": initial,
-            "fallback": True,
-            "response_mode": "mock_fallback",
+            "fallback": False,
+            "response_mode": "guarded_policy",
             "llm_invoked": True,
-            "policy_guardrail_applied": False,
+            "policy_guardrail_applied": True,
             "generation_error": None,
-            "trace": ["ollama_generate", "llm_validation_failed"],
+            "trace": ["ollama_generate", "policy_guardrail"],
         }
     except Exception as exc:
         return {

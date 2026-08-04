@@ -158,9 +158,14 @@ def test_model_answer_is_not_modified_with_document_title(monkeypatch) -> None:
     )
     payload = response.json()
     assert payload["fallback"] is False
-    assert payload["response_mode"] == "llm_verified"
-    assert payload["policy_guardrail_applied"] is False
-    assert payload["answer"] == "의심 통화를 종료하고 송금을 중단한 뒤 금융회사 공식 대표번호로 사실을 확인하고 증거를 보관하세요."
+    assert payload["response_mode"] == "guarded_policy"
+    assert payload["policy_guardrail_applied"] is True
+    assert payload["answer"] != "의심 통화를 종료하고 송금을 중단한 뒤 금융회사 공식 대표번호로 사실을 확인하고 증거를 보관하세요."
+    assert "강한 사기 징후 없음" in payload["answer"]
+    assert "새로운 송금·앱 설치 요구 시 중단" in payload["answer"]
+    assert "불필요한 개인정보 제공 금지" in payload["answer"]
+    snapshot = graph.chat_graph.get_state({"configurable": {"thread_id": payload["session_id"]}})
+    assert "의심 통화를 종료하고 송금을 중단한 뒤" not in repr(snapshot.values)
     assert payload["documents"][0]["title"] not in payload["answer"]
     assert "citation_enriched" not in payload["trace"]
 
@@ -196,6 +201,8 @@ def test_risky_qwen_output_never_controls_final_answer(monkeypatch, qwen_output:
     assert payload["answer"] == expected
     assert payload["answer"] != qwen_output
     assert qwen_output not in response.text
+    snapshot = graph.chat_graph.get_state({"configurable": {"thread_id": payload["session_id"]}})
+    assert qwen_output not in repr(snapshot.values)
     assert payload["response_mode"] == "guarded_policy"
     assert payload["llm_invoked"] is True
     assert payload["policy_guardrail_applied"] is True
@@ -228,9 +235,10 @@ def test_guarded_policy_answer_drops_non_allowlisted_policy_actions() -> None:
         "원격제어 앱을 설치하세요. 금융회사 공식 대표번호로 상담 내용을 확인하고 자료를 보관하세요.",
         "링크를 클릭하세요. 금융회사 공식 대표번호로 상담 내용을 확인하고 관련 자료를 보관하세요.",
         "현금을 직원에게 전달하세요. 금융회사 공식 대표번호로 상담 내용을 확인하고 자료를 보관하세요.",
+        "정상 상담으로 보입니다. 금융회사 공식 대표번호와 공식 앱에서 영업시간을 확인하세요. NORMAL-RAW-SENTINEL-6.",
     ],
 )
-def test_normal_input_financial_action_recommendation_uses_mock_fallback(monkeypatch, qwen_output: str) -> None:
+def test_normal_qwen_output_never_controls_final_answer(monkeypatch, qwen_output: str) -> None:
     async def fake_ollama(_messages):
         return qwen_output
 
@@ -241,12 +249,18 @@ def test_normal_input_financial_action_recommendation_uses_mock_fallback(monkeyp
     )
     payload = response.json()
     assert payload["risk"]["verdict"] == "정상"
-    assert payload["response_mode"] == "mock_fallback"
-    assert payload["fallback"] is True
-    assert payload["fallback_reason"] == "safety_validation_failure"
-    assert payload["safety"]["initial_passed"] is False
-    assert "no_dangerous_action_recommendation" in payload["safety"]["initial_violations"]
-    assert "safety_fallback" in payload["trace"]
+    assert payload["response_mode"] == "guarded_policy"
+    assert payload["llm_invoked"] is True
+    assert payload["policy_guardrail_applied"] is True
+    assert payload["fallback"] is False
+    assert payload["fallback_reason"] is None
+    assert qwen_output not in response.text
+    snapshot = graph.chat_graph.get_state({"configurable": {"thread_id": payload["session_id"]}})
+    assert qwen_output not in repr(snapshot.values)
+    assert "강한 사기 징후 없음" in payload["answer"]
+    assert "새로운 송금·앱 설치 요구 시 중단" in payload["answer"]
+    assert "공식 대표번호·앱에서 사실 확인" in payload["answer"]
+    assert "불필요한 개인정보 제공 금지" in payload["answer"]
     assert graph.recommends_dangerous_action(payload["answer"]) is False
 
 
