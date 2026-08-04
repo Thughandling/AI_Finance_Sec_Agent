@@ -21,6 +21,8 @@ const defaults: Record<Provider, string> = {
   qwen: "qwen-plus",
 };
 
+const CLOUD_TIMEOUT_MS = 60_000;
+
 async function callLocalLangGraph(body: ChatRequest) {
   const baseUrl = (process.env.FASTAPI_BASE_URL ?? "http://127.0.0.1:8000").replace(/\/$/, "");
   const response = await fetch(`${baseUrl}/api/chat`, {
@@ -53,6 +55,7 @@ async function callOpenAICompatible(url: string, apiKey: string, model: string, 
     method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({ model, messages: messages(body), temperature: 0.1, max_tokens: 600 }),
+    signal: AbortSignal.timeout(CLOUD_TIMEOUT_MS),
   });
   const data = await response.json() as { choices?: Array<{ message?: { content?: string } }>; error?: { message?: string } };
   if (!response.ok) throw new Error(data.error?.message ?? `Provider error ${response.status}`);
@@ -68,6 +71,7 @@ async function callOpenAI(apiKey: string, model: string, body: ChatRequest) {
     method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({ model, input, max_output_tokens: 600, reasoning: { effort: "low" } }),
+    signal: AbortSignal.timeout(CLOUD_TIMEOUT_MS),
   });
   const data = await response.json() as { output_text?: string; output?: Array<{ content?: Array<{ text?: string }> }>; error?: { message?: string } };
   if (!response.ok) throw new Error(data.error?.message ?? `OpenAI error ${response.status}`);
@@ -85,6 +89,7 @@ async function callAnthropic(apiKey: string, model: string, body: ChatRequest) {
       max_tokens: 600,
       temperature: 0.1,
     }),
+    signal: AbortSignal.timeout(CLOUD_TIMEOUT_MS),
   });
   const data = await response.json() as { content?: Array<{ type: string; text?: string }>; error?: { message?: string } };
   if (!response.ok) throw new Error(data.error?.message ?? `Anthropic error ${response.status}`);
@@ -97,6 +102,7 @@ async function callGemini(apiKey: string, model: string, body: ChatRequest) {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { temperature: 0.1, maxOutputTokens: 600 } }),
+    signal: AbortSignal.timeout(CLOUD_TIMEOUT_MS),
   });
   const data = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>; error?: { message?: string } };
   if (!response.ok) throw new Error(data.error?.message ?? `Gemini error ${response.status}`);

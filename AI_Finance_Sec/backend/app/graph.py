@@ -82,6 +82,7 @@ KNOWLEDGE_BASE = (
 class ChatState(TypedDict, total=False):
     messages: Annotated[list[AnyMessage], add_messages]
     user_input: str
+    analysis_input: str
     risk: dict[str, Any]
     documents: list[dict[str, Any]]
     policy: dict[str, Any]
@@ -174,7 +175,17 @@ async def call_ollama(messages: list[dict[str, str]]) -> str:
     async with httpx.AsyncClient(timeout=OLLAMA_TIMEOUT_SECONDS) as client:
         response = await client.post(
             f"{OLLAMA_BASE_URL}/api/chat",
-            json={"model": OLLAMA_MODEL, "messages": messages, "stream": False, "options": {"temperature": 0.1, "num_ctx": 4096}},
+            json={
+                "model": OLLAMA_MODEL,
+                "messages": messages,
+                "stream": False,
+                "options": {
+                    "temperature": 0.1,
+                    "num_ctx": 4096,
+                    "num_predict": 180,
+                    "stop": ["<|assistant|>", "<|system|>", "<think>"],
+                },
+            },
         )
         response.raise_for_status()
         payload = response.json()
@@ -187,20 +198,31 @@ async def call_ollama(messages: list[dict[str, str]]) -> str:
 def prepare_input(state: ChatState) -> dict[str, Any]:
     if not state.get("user_input", "").strip():
         raise ValueError("사용자 입력이 비어 있습니다.")
-    return {"user_input": state["user_input"].strip(), "provider": "ollama", "model": OLLAMA_MODEL, "trace": ["prepare_input"]}
+    recent_user_messages = [
+        str(message.content).strip()
+        for message in state.get("messages", [])
+        if isinstance(message, HumanMessage) and str(message.content).strip()
+    ][-3:]
+    return {
+        "user_input": state["user_input"].strip(),
+        "analysis_input": "\n".join(recent_user_messages),
+        "provider": "ollama",
+        "model": OLLAMA_MODEL,
+        "trace": ["prepare_input"],
+    }
 
 
 def risk_agent(state: ChatState) -> dict[str, Any]:
-    return {"risk": analyze_risk(state["user_input"]), "trace": ["risk_agent"]}
+    return {"risk": analyze_risk(state["analysis_input"]), "trace": ["risk_agent"]}
 
 
 def knowledge_agent(state: ChatState) -> dict[str, Any]:
-    risk = analyze_risk(state["user_input"])
-    return {"documents": retrieve_documents(state["user_input"], risk["risk_type"]), "trace": ["knowledge_agent"]}
+    risk = analyze_risk(state["analysis_input"])
+    return {"documents": retrieve_documents(state["analysis_input"], risk["risk_type"]), "trace": ["knowledge_agent"]}
 
 
 def policy_agent(state: ChatState) -> dict[str, Any]:
-    return {"policy": recommend_policy(analyze_risk(state["user_input"])), "trace": ["policy_agent"]}
+    return {"policy": recommend_policy(analyze_risk(state["analysis_input"])), "trace": ["policy_agent"]}
 
 
 async def generate_answer(state: ChatState) -> dict[str, Any]:
@@ -215,8 +237,11 @@ async def generate_answer(state: ChatState) -> dict[str, Any]:
         "content": (
             "당신은 AI_Finance_Sec 금융 보안 비서다. 한국어로 짧고 침착하게 답한다. "
             "통화 종료, 추가 송금·앱 설치 중단, 공식 대표번호 확인을 우선한다. "
-            "실제로 신고·지급정지·송금취소를 완료했다고 주장하지 않는다.\n"
-            f"위험 분석: {state['risk']}\n근거 문서: {state['documents']}\n허용 정책: {state['policy']}"
+            "실제로 신고·지급정지·송금취소를 완료했다고 주장하지 않는다. "
+            "한국어 외 문자, 역할명, 사고과정, JSON, 코드, 번역문을 출력하지 않는다. "
+            "답변 마지막에는 제공된 첫 번째 문서 제목을 그대로 사용해 '근거: 문서 제목.' 형식으로 쓴다.\n"
+            f"사건 컨텍스트: {state['analysis_input']}\n위험 분석: {state['risk']}\n"
+            f"근거 문서: {state['documents']}\n허용 정책: {state['policy']}"
         ),
     }
     try:
@@ -234,15 +259,25 @@ async def generate_answer(state: ChatState) -> dict[str, Any]:
 def evaluate_safety(answer: str, risk: dict[str, Any], documents: list[dict[str, Any]]) -> dict[str, Any]:
     dangerous = risk["verdict"] == "사기"
     transferred = risk["already_transferred"]
+    allowed_citations = [
+        str(value)
+        for document in documents
+        for value in (document.get("title"), document.get("id"))
+        if value
+    ]
     checks = {
         "minimum_length": len(answer.strip()) >= 40,
         "risk_stop_action": (not dangerous) or bool(re.search(r"중단|종료|끊", answer)),
         "official_verification": bool(re.search(r"공식|대표번호|금융회사|경찰청|금융감독원", answer)),
         "post_transfer_action": (not transferred) or bool(re.search(r"112|지급정지|금융회사", answer)),
         "no_false_external_completion": not bool(re.search(r"신고(가|를)? 완료|지급정지(가|를)? 완료|처리되었습니다|송금취소 완료", answer)),
-        "korean_only": not bool(re.search(r"[\u4e00-\u9fff]", answer)),
-        "no_prompt_artifacts": not bool(re.search(r"(?i)\b(system|assistant|user)\b|번역|翻译|translate", answer)),
+        "korean_only": not bool(re.search(r"[\u3040-\u30ff\u3400-\u9fff]", answer)),
+        "no_prompt_artifacts": not bool(
+            re.search(r"(?i)<\/?think>|<\|(?:system|assistant|user)\|>|\b(system|assistant|user)\b|번역|翻译|translate", answer)
+        ),
+        "no_code_or_json": not bool(re.search(r"```|^\s*[\{\[]", answer)),
         "documents_present": bool(documents),
+        "citation_matches_document": bool(allowed_citations) and any(citation in answer for citation in allowed_citations),
     }
     return {"passed": all(checks.values()), "checks": checks, "violations": [name for name, passed in checks.items() if not passed]}
 
@@ -255,6 +290,9 @@ def safety_verifier(state: ChatState) -> dict[str, Any]:
         final_answer = safe_mock_answer(state["risk"], state["documents"])
         fallback = True
     final = evaluate_safety(final_answer, state["risk"], state["documents"])
+    trace = ["safety_verifier"]
+    if not initial["passed"]:
+        trace.append("safety_fallback")
     return {
         "final_answer": final_answer,
         "fallback": fallback,
@@ -266,7 +304,7 @@ def safety_verifier(state: ChatState) -> dict[str, Any]:
             "initial_violations": initial["violations"],
             "fallback_applied": fallback,
         },
-        "trace": ["safety_verifier"],
+        "trace": trace,
     }
 
 
@@ -316,6 +354,13 @@ async def run_chat(message: str, session_id: str) -> dict[str, Any]:
         "provider": result["provider"],
         "model": result["model"],
         "fallback": bool(result["fallback"]),
+        "fallback_reason": (
+            "ollama_call_failure"
+            if result.get("generation_error")
+            else "safety_validation_failure"
+            if not result["safety"]["initial_passed"]
+            else None
+        ),
         "generation_error": result.get("generation_error"),
         "session_id": session_id,
         "turn_count": result["turn_count"],

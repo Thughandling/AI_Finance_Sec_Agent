@@ -20,7 +20,7 @@ npm install
 npm run dev
 ```
 
-브라우저에서 <http://localhost:3000>을 엽니다. 실제 모델을 사용하려면 우측 상단 `설정`에서 Provider와 본인의 API 키를 입력합니다. 키는 브라우저 메모리와 1회 서버 요청에만 사용하며 저장하지 않습니다.
+브라우저에서 <http://localhost:3000>을 엽니다. 실제 모델을 사용하려면 우측 상단 `설정`에서 Provider와 본인의 API 키를 입력합니다. Cloud BYOK 키는 Next 서버 프록시를 경유하며 애플리케이션 저장 기능은 없지만 호스팅 사업자의 로그 정책은 별도입니다.
 
 ## Ollama Local + 실제 LangGraph 데모
 
@@ -77,15 +77,22 @@ source backend/.venv/bin/activate
 python -m pytest backend/tests -q
 ```
 
-실제 로컬 Ollama 선택 smoke test는 Ollama와 FastAPI를 실행한 뒤 별도로 수행합니다.
+실제 로컬 Ollama 선택 smoke test는 Ollama와 FastAPI를 실행한 뒤 별도로 수행합니다. 동일 세션 2턴을 검증하는 재현 스크립트와 최근 sanitised 결과는 `backend/scripts/smoke_ollama.py`, `backend/smoke/`에 있습니다.
 
 ```bash
-curl -s http://127.0.0.1:8000/api/chat \
-  -H 'content-type: application/json' \
-  -d '{"message":"검찰이 안전계좌로 송금하라고 합니다.","session_id":"smoke-001"}'
+backend/.venv/bin/python backend/scripts/smoke_ollama.py
 ```
 
-주요 파일은 `app/page.tsx`(UI), `app/lib/engine.ts`(State·탐지·검색·평가), `app/api/chat/route.ts`(모델 라우터), `AI_Finance_Sec_Chatbot_Orchestration.ipynb`(전체 오케스트레이션 노트북)입니다.
+주요 파일은 다음과 같습니다.
+
+- `app/page.tsx`: UI와 actual/simulated 결과 분리
+- `app/lib/engine.ts`: 샘플 State·탐지·검색·평가
+- `app/api/chat/route.ts`: Ollama·Cloud Provider 프록시
+- `backend/main.py`: FastAPI 엔드포인트와 입력 검증
+- `backend/app/graph.py`: 실제 LangGraph·Ollama·Safety·멀티턴 메모리
+- `backend/tests/test_api.py`: 백엔드 회귀 검증
+- `tests/engine.test.mjs`, `tests/rendered-html.test.mjs`: 프론트 회귀 검증
+- `AI_Finance_Sec_Chatbot_Orchestration.ipynb`: 독립 실행형 오케스트레이션 노트북
 
 ## 데모 주의사항
 

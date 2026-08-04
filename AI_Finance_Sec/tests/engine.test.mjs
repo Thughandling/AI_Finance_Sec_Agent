@@ -46,3 +46,30 @@ test("keeps free chat risk independent from selected scenario transactions", asy
   assert.match(page, /const currentDetection = analyzeText\(value, 0\)/);
   assert.doesNotMatch(page, /const currentDetection = analyzeText\(value, transactionRisk\)/);
 });
+
+test("renders actual graph state from the FastAPI response and resets local sessions", async () => {
+  const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  assert.match(page, /const \[lastGraphRun, setLastGraphRun\]/);
+  assert.match(page, /setLastGraphRun\(data\)/);
+  assert.match(page, /lastGraphRun\?\.risk\?\.score/);
+  assert.match(page, /lastGraphRun\?\.documents/);
+  assert.match(page, /lastGraphRun\?\.safety/);
+  assert.match(page, /session \{lastGraphRun\.session_id\}/);
+  assert.match(page, /turn \{lastGraphRun\.turn_count\}/);
+  assert.match(page, /sessionId\.current = ""/);
+  assert.match(page, /setLastGraphRun\(null\)/);
+  assert.match(page, /actual-risk-panel/);
+  assert.match(page, /data-testid="actual-safety-detail"/);
+});
+
+test("distinguishes local Qwen from Qwen Cloud and times out cloud providers", async () => {
+  const [engineSource, route] = await Promise.all([
+    readFile(new URL("../app/lib/engine.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/chat/route.ts", import.meta.url), "utf8"),
+  ]);
+  assert.match(engineSource, /Qwen Cloud \(DashScope\)/);
+  assert.match(engineSource, /BYOK · Cloud/);
+  assert.match(engineSource, /Ollama Local/);
+  assert.match(route, /CLOUD_TIMEOUT_MS/);
+  assert.ok((route.match(/AbortSignal\.timeout\(CLOUD_TIMEOUT_MS\)/g) ?? []).length >= 4);
+});

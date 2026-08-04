@@ -1,0 +1,55 @@
+{
+  "generated_at_utc": "2026-08-04T09:24:07+00:00",
+  "environment": {
+    "platform": "macOS-26.5.1-arm64-arm-64bit",
+    "machine": "arm64",
+    "api_base_url": "http://127.0.0.1:8000",
+    "health": {
+      "status": "ok",
+      "provider": "ollama",
+      "model": "qwen2.5:7b",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "memory": "demo-only-in-memory"
+    }
+  },
+  "commands": [
+    "ollama serve",
+    "uvicorn backend.main:app --host 127.0.0.1 --port 8000",
+    "backend/.venv/bin/python backend/scripts/smoke_ollama.py"
+  ],
+  "assertions": "same session, qwen2.5:7b, fallback=false, turn 1->2, safety passed, required trace",
+  "turns": [
+    {
+      "request": {
+        "message": "검찰 수사관이 안전계좌로 지금 즉시 송금하라고 합니다. 어떻게 해야 하나요?"
+      },
+      "response": {
+        "session_id": "smoke-20260804T092407Z",
+        "turn_count": 1,
+        "provider": "ollama",
+        "model": "qwen2.5:7b",
+        "fallback": false,
+        "fallback_reason": null,
+        "risk": { "score": 88, "level": "위험", "verdict": "사기", "risk_type": "기관 사칭" },
+        "top1_document": { "id": "FSS-ORG-001", "title": "기관사칭형 보이스피싱 대응" },
+        "safety": { "passed": true, "initial_passed": true },
+        "trace": ["prepare_input", "knowledge_agent", "policy_agent", "risk_agent", "ollama_generate", "safety_verifier", "finalize"]
+      }
+    },
+    {
+      "request": { "message": "그 계좌로 보내도 돼요?" },
+      "response": {
+        "session_id": "smoke-20260804T092407Z",
+        "turn_count": 2,
+        "provider": "ollama",
+        "model": "qwen2.5:7b",
+        "fallback": false,
+        "fallback_reason": null,
+        "risk": { "score": 88, "level": "위험", "verdict": "사기", "risk_type": "기관 사칭" },
+        "top1_document": { "id": "FSS-ORG-001", "title": "기관사칭형 보이스피싱 대응" },
+        "safety": { "passed": true, "initial_passed": true },
+        "trace": ["prepare_input", "knowledge_agent", "policy_agent", "risk_agent", "ollama_generate", "safety_verifier", "finalize"]
+      }
+    }
+  ]
+}

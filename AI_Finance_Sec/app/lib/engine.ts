@@ -56,7 +56,7 @@ export const providers = [
   { id: "deepseek", label: "DeepSeek", model: "deepseek-v4-flash", keyName: "DEEPSEEK_API_KEY", badge: "권장·저비용" },
   { id: "anthropic", label: "Claude", model: "claude-sonnet-4-5-20250929", keyName: "ANTHROPIC_API_KEY", badge: "대안" },
   { id: "gemini", label: "Gemini", model: "gemini-2.5-flash", keyName: "GOOGLE_API_KEY", badge: "대안" },
-  { id: "qwen", label: "Qwen", model: "qwen-plus", keyName: "DASHSCOPE_API_KEY", badge: "내부망 확장 후보" },
+  { id: "qwen", label: "Qwen Cloud (DashScope)", model: "qwen-plus", keyName: "DASHSCOPE_API_KEY", badge: "BYOK · Cloud" },
 ] as const;
 
 export type ProviderId = (typeof providers)[number]["id"];
