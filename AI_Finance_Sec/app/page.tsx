@@ -22,6 +22,16 @@ type Message = {
   fallback?: boolean;
 };
 
+type LocalGraphResponse = {
+  answer?: string;
+  error?: string;
+  model?: string;
+  trace?: string[];
+  fallback?: boolean;
+  safety?: { passed?: boolean };
+  turn_count?: number;
+};
+
 function ShieldIcon() {
   return <span className="shield" aria-hidden="true"><span>✓</span></span>;
 }
@@ -40,10 +50,12 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [input, setInput] = useState("");
   const [toast, setToast] = useState("");
+  const [actualTrace, setActualTrace] = useState<string[]>([]);
   const [messages, setMessages] = useState<Message[]>([
     { role: "assistant", text: "안녕하세요. 합성 통화·거래 시나리오를 분석하고, 공식 대응 지식을 근거로 다음 행동을 안내합니다.", model: "Mock Safety Engine" },
   ]);
   const chatEnd = useRef<HTMLDivElement>(null);
+  const sessionId = useRef("");
 
   const scenario = useMemo(() => scenarios.find((item) => item.id === selectedId) ?? scenarios[0], [selectedId]);
   const provider = providers.find((item) => item.id === providerId) ?? providers[0];
@@ -57,7 +69,8 @@ export default function Home() {
   const detection: DetectionResult = { ...baseDetection, score, level, verdict: score >= 40 ? "사기" : "정상" };
   const retrieved = retrieveAndRerank(transcript || scenario.description, detection.riskType);
   const finalVerification = messages.filter((message) => message.role === "assistant").at(-1);
-  const verification = finalVerification ? verifyAnswer(finalVerification.text, detection) : null;
+  const hasChatTurn = messages.some((message) => message.role === "user");
+  const verification = (lineIndex >= 0 || hasChatTurn) && finalVerification ? verifyAnswer(finalVerification.text, detection) : null;
 
   useEffect(() => {
     if (!playing) return;
@@ -81,6 +94,7 @@ export default function Home() {
     setSelectedId(id);
     setPlaying(false);
     setLineIndex(-1);
+    setActualTrace([]);
     setMessages([{ role: "assistant", text: "시나리오가 준비됐습니다. 탐지 시작을 누르면 State와 분석 결과가 단계별로 갱신됩니다.", model: "Mock Safety Engine" }]);
   }
 
@@ -101,7 +115,7 @@ export default function Home() {
     event.preventDefault();
     const value = input.trim();
     if (!value || loading) return;
-    if (providerId !== "mock" && !apiKey) {
+    if (providerId !== "mock" && providerId !== "ollama" && !apiKey) {
       setSettingsOpen(true);
       showToast("실제 모델 호출에는 선택한 Provider의 API 키가 필요합니다.");
       return;
@@ -109,17 +123,21 @@ export default function Home() {
 
     setInput("");
     setMessages((previous) => [...previous, { role: "user", text: value }]);
-    const currentDetection = analyzeText(value, transactionRisk);
+    // 자유 채팅은 선택된 샘플 거래 State와 분리해 교차 오염을 막는다.
+    const currentDetection = analyzeText(value, 0);
     const documents = retrieveAndRerank(value, currentDetection.riskType);
     const mockAnswer = buildMockAnswer(currentDetection, documents, value);
 
     if (providerId === "mock") {
+      setActualTrace([]);
       setMessages((previous) => [...previous, { role: "assistant", text: mockAnswer, model: provider.model, actions: currentDetection.verdict === "사기" }]);
       return;
     }
 
+    setActualTrace([]);
     setLoading(true);
     try {
+      if (!sessionId.current) sessionId.current = `web-${crypto.randomUUID()}`;
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -127,31 +145,36 @@ export default function Home() {
           provider: providerId,
           apiKey,
           model: provider.model,
+          sessionId: sessionId.current,
           message: value,
           history: messages.slice(-6).map((message) => ({ role: message.role, content: message.text })),
           context: JSON.stringify({ detection: currentDetection, documents }, null, 2),
         }),
       });
-      const data = await response.json() as { answer?: string; error?: string; model?: string };
+      const data = await response.json() as LocalGraphResponse;
       if (!response.ok || !data.answer) throw new Error(data.error || "모델 응답을 확인할 수 없습니다.");
-      const check = verifyAnswer(data.answer, currentDetection);
+      const check = providerId === "ollama" && data.safety ? { passed: Boolean(data.safety.passed), checks: [] } : verifyAnswer(data.answer, currentDetection);
       const safeAnswer = check.passed ? data.answer : mockAnswer;
+      setActualTrace(providerId === "ollama" ? data.trace ?? [] : []);
       setMessages((previous) => [...previous, {
         role: "assistant",
         text: safeAnswer,
-        model: check.passed ? data.model ?? provider.model : "Mock Safety Fallback",
+        model: data.fallback || !check.passed ? "Mock Safety Fallback" : data.model ?? provider.model,
         actions: currentDetection.verdict === "사기",
-        fallback: !check.passed,
+        fallback: Boolean(data.fallback) || !check.passed,
       }]);
-    } catch {
+    } catch (error) {
+      setActualTrace([]);
       setMessages((previous) => [...previous, { role: "assistant", text: mockAnswer, model: "Mock Safety Fallback", actions: currentDetection.verdict === "사기", fallback: true }]);
-      showToast("외부 모델 호출에 실패해 검증된 Mock 안전응답으로 전환했습니다.");
+      const reason = error instanceof Error ? error.message : "모델 연결 실패";
+      showToast(`${providerId === "ollama" ? "로컬 FastAPI/Ollama" : "외부 모델"} 호출에 실패해 Mock 안전응답으로 전환했습니다. ${reason}`.slice(0, 180));
     } finally {
       setLoading(false);
     }
   }
 
-  const completedStep = lineIndex < 0 ? 0 : lineIndex < 1 ? 2 : lineIndex < 3 ? 4 : 7;
+  const completedStep = actualTrace.length > 0 ? actualTrace.length : lineIndex < 0 ? 0 : lineIndex < 1 ? 2 : lineIndex < 3 ? 4 : 7;
+  const displayedPipeline = actualTrace.length > 0 ? actualTrace : pipelineSteps;
 
   return (
     <main className="app-shell">
@@ -165,11 +188,11 @@ export default function Home() {
       </header>
 
       <section className="pipeline" aria-label="AI 처리 단계">
-        <div className="pipeline-title"><span>LANGGRAPH FLOW</span><strong>처리 과정</strong></div>
+        <div className="pipeline-title"><span>{actualTrace.length > 0 ? "LANGGRAPH ACTUAL TRACE" : "SIMULATED DEMO FLOW"}</span><strong>{actualTrace.length > 0 ? "FastAPI 실행 결과" : "샘플 처리 과정"}</strong></div>
         <div className="pipeline-steps">
-          {pipelineSteps.map((step, index) => (
+          {displayedPipeline.map((step, index) => (
             <div className={`pipeline-step ${index < completedStep ? "done" : index === completedStep ? "active" : ""}`} key={step}>
-              <i>{index < completedStep ? "✓" : index + 1}</i><span>{step}</span>{index < pipelineSteps.length - 1 && <b>→</b>}
+              <i>{index < completedStep ? "✓" : index + 1}</i><span>{step}</span>{index < displayedPipeline.length - 1 && <b>→</b>}
             </div>
           ))}
         </div>
@@ -267,10 +290,10 @@ export default function Home() {
         <section className="model-modal" role="dialog" aria-modal="true" aria-label="AI 모델 설정">
           <div className="modal-heading"><div><span>BYOK MODEL ROUTER</span><h2>시연 모델을 선택하세요</h2><p>API 키는 현재 브라우저 메모리와 1회 요청에만 사용하며 저장하지 않습니다.</p></div><button onClick={() => setSettingsOpen(false)} aria-label="설정 닫기">×</button></div>
           <div className="provider-grid">
-            {providers.map((item) => <button key={item.id} className={providerId === item.id ? "selected" : ""} onClick={() => { setProviderId(item.id); setApiKey(""); }}><span className={`provider-dot ${item.id}`} /><span><strong>{item.label}</strong><small>{item.model}</small></span><b>{item.badge}</b></button>)}
+            {providers.map((item) => <button key={item.id} className={providerId === item.id ? "selected" : ""} onClick={() => { setProviderId(item.id); setApiKey(""); setActualTrace([]); }}><span className={`provider-dot ${item.id}`} /><span><strong>{item.label}</strong><small>{item.model}</small></span><b>{item.badge}</b></button>)}
           </div>
-          {providerId !== "mock" ? <label className="key-field"><span>{provider.keyName}</span><input type="password" autoComplete="off" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder="API 키를 붙여 넣으세요" /><small>소스코드·로그·DB·브라우저 저장소에 기록하지 않습니다.</small></label> : <div className="mock-notice"><strong>심사용 권장 모드</strong><span>외부 서비스 없이 State, 탐지, RAG, 리랭킹, 답변, 안전검증 전 과정을 재현합니다.</span></div>}
-          <button className="apply-model" onClick={() => setSettingsOpen(false)}>{providerId === "mock" || apiKey ? `${provider.label} 적용` : "API 키 입력 후 적용"}</button>
+          {providerId !== "mock" && providerId !== "ollama" ? <label className="key-field"><span>{provider.keyName}</span><input type="password" autoComplete="off" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder="API 키를 붙여 넣으세요" /><small>키는 서버 프록시를 경유합니다. 저장하지 않지만 공개 시연보다 로컬 실행과 제한된 촬영용 키를 권장합니다.</small></label> : providerId === "ollama" ? <div className="mock-notice"><strong>로컬 LangGraph 권장 모드</strong><span>FastAPI와 Ollama가 같은 PC에서 실행되어야 합니다. 공개 배포 URL에서는 사용자 PC의 localhost에 접근할 수 없어 Mock으로 폴백합니다.</span></div> : <div className="mock-notice"><strong>심사용 권장 모드</strong><span>외부 서비스 없이 State, 탐지, RAG, 리랭킹, 답변, 안전검증 전 과정을 재현합니다.</span></div>}
+          <button className="apply-model" onClick={() => setSettingsOpen(false)}>{providerId === "mock" || providerId === "ollama" || apiKey ? `${provider.label} 적용` : "API 키 입력 후 적용"}</button>
         </section>
       </div>}
       {toast && <div className="toast"><span>✓</span>{toast}</div>}

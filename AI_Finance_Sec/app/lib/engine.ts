@@ -51,6 +51,7 @@ export type RetrievalResult = KnowledgeDocument & {
 
 export const providers = [
   { id: "mock", label: "Mock", model: "Deterministic Safety Engine", keyName: "", badge: "API 키 불필요" },
+  { id: "ollama", label: "Ollama Local", model: "qwen2.5:7b", keyName: "", badge: "API 키 불필요 · 로컬" },
   { id: "openai", label: "OpenAI", model: "gpt-5.6-terra", keyName: "OPENAI_API_KEY", badge: "Responses API" },
   { id: "deepseek", label: "DeepSeek", model: "deepseek-v4-flash", keyName: "DEEPSEEK_API_KEY", badge: "권장·저비용" },
   { id: "anthropic", label: "Claude", model: "claude-sonnet-4-5-20250929", keyName: "ANTHROPIC_API_KEY", badge: "대안" },
@@ -196,8 +197,9 @@ const fraudSignals: Array<{ terms: string[]; weight: number; type: string }> = [
   { terms: ["안전계좌", "검찰", "수사관", "금감원"], weight: 28, type: "기관 사칭" },
   { terms: ["지금 즉시", "오늘 안에", "전화 끊으면", "비밀"], weight: 20, type: "긴급성" },
   { terms: ["이체", "송금", "수수료", "현금", "지정 계좌"], weight: 30, type: "금전 요구" },
-  { terms: ["앱 설치", "원격제어", "apk", "링크 클릭"], weight: 35, type: "앱 설치" },
-  { terms: ["자녀", "따님", "아들", "사고", "납치"], weight: 23, type: "가족 빙자" },
+  { terms: ["대출", "대환대출", "선입금"], weight: 34, type: "대출 미끼" },
+  { terms: ["앱 설치", "앱을 설치", "원격제어", "apk", "링크", "설치하세요"], weight: 42, type: "앱 설치" },
+  { terms: ["자녀", "따님", "아들", "사고", "납치"], weight: 30, type: "가족 빙자" },
 ];
 
 const negations = ["필요는 없습니다", "요구하지 않습니다", "하지 마세요", "불필요", "대표번호로 다시"];
@@ -220,14 +222,21 @@ export function analyzeText(text: string, transactionRisk = 0): DetectionResult 
 
   const negationHits = negations.filter((term) => normalized.includes(term.toLowerCase()));
   if (negationHits.length > 0) {
-    score -= Math.min(55, 25 + negationHits.length * 10);
+    score -= Math.min(90, 35 + negationHits.length * 25);
     evidence.push(`정상성 근거: ${negationHits.join("·")}`);
+  }
+
+  const alreadyTransferred = /이미.*(송금|이체)|보냈|입금했/.test(normalized);
+  if (alreadyTransferred) {
+    score = Math.max(score, 75);
+    typeScores.set("피해 발생", 75);
+    evidence.push("피해 발생: 송금·이체 완료 표현");
   }
 
   score = Math.max(0, Math.min(100, score));
   const level: RiskLevel = score >= 70 ? "위험" : score >= 40 ? "주의" : "안전";
   const verdict: ExpectedLabel = score >= 40 ? "사기" : "정상";
-  const riskType = [...typeScores.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "정상 절차";
+  const riskType = score < 40 ? "정상 절차" : [...typeScores.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "정상 절차";
   const actions = verdict === "정상"
     ? ["공식 대표번호·앱에서 상담 내용 재확인", "불필요한 개인정보는 제공하지 않기"]
     : ["통화 즉시 종료", "추가 송금·앱 설치 중단", "증거 보관", "112와 금융회사에 직접 연락"];
@@ -259,8 +268,10 @@ export function retrieveAndRerank(query: string, riskType: string): RetrievalRes
     .map((doc) => {
       const lexicalRank = lexicalRanks.get(doc) ?? currentDocs.length;
       const semanticRank = semanticRanks.get(doc) ?? currentDocs.length;
-      const authorityBonus = ["금융감독원", "경찰청", "금융보안원"].includes(doc.authority) ? 0.01 : 0;
-      const rerankScore = 1 / (60 + lexicalRank) + 1 / (60 + semanticRank) + authorityBonus;
+      // RRF 순위를 뒤집지 않는 작은 tie-breaker만 적용한다.
+      const authorityBonus = ["금융감독원", "경찰청", "금융보안원"].includes(doc.authority) ? 0.000001 : 0;
+      const riskTypeBonus = doc.riskTypes.includes(riskType) ? 0.01 : 0;
+      const rerankScore = 1 / (60 + lexicalRank) + 1 / (60 + semanticRank) + riskTypeBonus + authorityBonus;
       return { ...doc, lexicalRank, semanticRank, rerankScore };
     })
     .sort((a, b) => b.rerankScore - a.rerankScore)
@@ -314,4 +325,3 @@ export function calculateEvaluation() {
 }
 
 export const pipelineSteps = ["입력 검증", "State", "병렬 탐지", "RAG 검색", "RRF 리랭킹", "모델 생성", "안전 검증"];
-

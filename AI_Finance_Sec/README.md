@@ -5,7 +5,7 @@
 ## 구현 범위
 
 - API 키 없이 끝까지 재현되는 결정론적 Mock 데모
-- OpenAI, DeepSeek, Claude, Gemini, Qwen BYOK 모델 라우터
+- Ollama Local(Qwen 2.5 7B)과 OpenAI, DeepSeek, Claude, Gemini, Qwen Cloud BYOK 모델 라우터
 - 기관 사칭·대출 사기·가족 빙자·정상 Hard Negative 합성 시나리오
 - State → 병렬 탐지 → RAG → RRF 리랭킹 → 모델 생성 → 안전 검증 흐름
 - 통화·거래 결합 위험도, 근거 Top 3, 정탐·오탐·미탐 표시
@@ -22,11 +22,67 @@ npm run dev
 
 브라우저에서 <http://localhost:3000>을 엽니다. 실제 모델을 사용하려면 우측 상단 `설정`에서 Provider와 본인의 API 키를 입력합니다. 키는 브라우저 메모리와 1회 서버 요청에만 사용하며 저장하지 않습니다.
 
+## Ollama Local + 실제 LangGraph 데모
+
+Ollama Local은 Qwen Cloud(DashScope)와 다른 실행 경로입니다. API 키 없이 사용자의 Mac에서 `qwen2.5:7b`를 실행하며, FastAPI 내부의 실제 LangGraph가 입력 → 병렬 위험분석·지식검색·정책 → 모델 생성 → Safety 검증 → finalize를 수행합니다.
+
+최초 한 번 모델을 준비합니다.
+
+Python 3.11 이상이 필요합니다. 먼저 `python3 --version`으로 확인하고, macOS 시스템 Python이 3.9라면 Homebrew Python 등 최신 Python 명령으로 가상환경을 만듭니다.
+
+```bash
+ollama pull qwen2.5:7b
+python3.14 -m venv backend/.venv
+source backend/.venv/bin/activate
+python -m pip install -r backend/requirements.txt
+```
+
+터미널 1에서 Ollama를 실행합니다.
+
+```bash
+ollama serve
+```
+
+터미널 2에서 FastAPI를 실행합니다.
+
+```bash
+cd /Users/dongyoungko/Documents/AI_Hacker/AI_Finance_Sec
+source backend/.venv/bin/activate
+uvicorn backend.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+터미널 3에서 웹을 실행합니다.
+
+```bash
+cd /Users/dongyoungko/Documents/AI_Hacker/AI_Finance_Sec
+npm run dev
+```
+
+- 홈페이지: <http://localhost:3000>
+- FastAPI 상태: <http://127.0.0.1:8000/health>
+- FastAPI 문서: <http://127.0.0.1:8000/docs>
+
+웹 설정에서 `Ollama Local`을 선택합니다. 기본값은 `OLLAMA_BASE_URL=http://127.0.0.1:11434`, `OLLAMA_MODEL=qwen2.5:7b`, timeout 45초이며 필요하면 FastAPI 실행 전에 환경변수로 변경할 수 있습니다. 프론트 프록시의 백엔드 주소는 `FASTAPI_BASE_URL`로 변경합니다.
+
+FastAPI의 `InMemorySaver`는 데모용 프로세스 메모리입니다. `session_id`별 멀티턴은 지원하지만 서버를 재시작하면 사라집니다. 112 신고나 지급정지는 실제 실행하지 않습니다. Ollama가 중단되거나 Safety 검증에 실패하면 응답과 UI에 `Mock Safety Fallback`을 표시합니다.
+
+공개 배포 서버는 사용자 PC의 localhost Ollama에 접근할 수 없습니다. Ollama 시연은 위 로컬 3개 프로세스 구성으로 실행하고, 공개 URL에서는 Mock 또는 클라우드 BYOK를 사용합니다. 클라우드 키는 저장하지 않지만 Next 서버 프록시를 경유하므로 제한된 촬영용 키를 이용한 로컬 시연을 권장합니다.
+
 ## 검증
 
 ```bash
 npm run build
 npm test
+source backend/.venv/bin/activate
+python -m pytest backend/tests -q
+```
+
+실제 로컬 Ollama 선택 smoke test는 Ollama와 FastAPI를 실행한 뒤 별도로 수행합니다.
+
+```bash
+curl -s http://127.0.0.1:8000/api/chat \
+  -H 'content-type: application/json' \
+  -d '{"message":"검찰이 안전계좌로 송금하라고 합니다.","session_id":"smoke-001"}'
 ```
 
 주요 파일은 `app/page.tsx`(UI), `app/lib/engine.ts`(State·탐지·검색·평가), `app/api/chat/route.ts`(모델 라우터), `AI_Finance_Sec_Chatbot_Orchestration.ipynb`(전체 오케스트레이션 노트북)입니다.

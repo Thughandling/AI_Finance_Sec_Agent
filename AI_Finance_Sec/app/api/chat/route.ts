@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-type Provider = "openai" | "deepseek" | "anthropic" | "gemini" | "qwen";
+type Provider = "ollama" | "openai" | "deepseek" | "anthropic" | "gemini" | "qwen";
 
 type ChatRequest = {
   provider?: Provider;
@@ -9,15 +9,30 @@ type ChatRequest = {
   message?: string;
   context?: string;
   history?: Array<{ role: "user" | "assistant"; content: string }>;
+  sessionId?: string;
 };
 
 const defaults: Record<Provider, string> = {
+  ollama: "qwen2.5:7b",
   openai: "gpt-5.6-terra",
   deepseek: "deepseek-v4-flash",
   anthropic: "claude-sonnet-4-5-20250929",
   gemini: "gemini-2.5-flash",
   qwen: "qwen-plus",
 };
+
+async function callLocalLangGraph(body: ChatRequest) {
+  const baseUrl = (process.env.FASTAPI_BASE_URL ?? "http://127.0.0.1:8000").replace(/\/$/, "");
+  const response = await fetch(`${baseUrl}/api/chat`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ message: String(body.message ?? "").slice(0, 2000), session_id: body.sessionId }),
+    signal: AbortSignal.timeout(60_000),
+  });
+  const data = await response.json() as Record<string, unknown> & { error?: string; detail?: string };
+  if (!response.ok) throw new Error(data.error ?? data.detail ?? `FastAPI error ${response.status}`);
+  return data;
+}
 
 const SYSTEM_PROMPT = `당신은 AI_Finance_Sec 금융 보안 비서다.
 반드시 한국어로 짧고 침착하게 답한다. 제공된 탐지 결과와 기관 가이드만 근거로 사용한다.
@@ -95,8 +110,20 @@ export async function POST(request: NextRequest) {
     const apiKey = String(body.apiKey ?? "").trim();
     const message = String(body.message ?? "").trim();
     if (!provider || !(provider in defaults)) return NextResponse.json({ error: "지원하지 않는 Provider입니다." }, { status: 400 });
-    if (!apiKey || apiKey.length < 12) return NextResponse.json({ error: "유효한 API 키가 필요합니다." }, { status: 400 });
     if (!message) return NextResponse.json({ error: "메시지가 비어 있습니다." }, { status: 400 });
+    if (provider === "ollama") {
+      try {
+        const result = await callLocalLangGraph(body);
+        return NextResponse.json(result, { headers: { "cache-control": "no-store" } });
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : "연결 실패";
+        return NextResponse.json(
+          { error: `로컬 FastAPI/Ollama에 연결할 수 없습니다. 공개 배포에서는 로컬 모델을 직접 호출할 수 없습니다. ${detail}`.slice(0, 400) },
+          { status: 503, headers: { "cache-control": "no-store" } },
+        );
+      }
+    }
+    if (!apiKey || apiKey.length < 12) return NextResponse.json({ error: "유효한 API 키가 필요합니다." }, { status: 400 });
     const model = String(body.model || defaults[provider]).slice(0, 120);
 
     let answer = "";
@@ -113,4 +140,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: message.slice(0, 300) }, { status: 502, headers: { "cache-control": "no-store" } });
   }
 }
-

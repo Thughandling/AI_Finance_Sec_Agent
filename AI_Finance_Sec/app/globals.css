@@ -21,6 +21,7 @@ button:focus-visible, input:focus-visible, a:focus-visible { outline: 3px solid 
 .provider-button b { color: var(--teal); font-size: 9px; }
 .provider-dot { width: 9px; height: 9px; border-radius: 50%; background: #74827f; box-shadow: 0 0 0 4px #e6ecea; flex: 0 0 auto; }
 .provider-dot.mock { background: var(--teal); box-shadow: 0 0 0 4px #dff5ef; }
+.provider-dot.ollama { background: #111827; box-shadow: 0 0 0 4px #e5e7eb; }
 .provider-dot.openai { background: #111; }.provider-dot.deepseek { background: #4c6fff; }.provider-dot.anthropic { background: #c76f43; }.provider-dot.gemini { background: #4585f4; }.provider-dot.qwen { background: #7047eb; }
 .pipeline { min-height: 70px; max-width: 1540px; margin: 0 auto; padding: 12px 22px; display: flex; align-items: center; gap: 26px; background: #163832; color: white; }
 .pipeline-title { min-width: 112px; display: flex; flex-direction: column; }
