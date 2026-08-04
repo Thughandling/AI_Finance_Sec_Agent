@@ -20,7 +20,7 @@ def test_health_describes_local_demo_memory() -> None:
 
 def test_langgraph_ollama_success_and_multiturn(monkeypatch) -> None:
     async def fake_ollama(_messages):
-        return "의심되는 통화를 즉시 종료하고 추가 송금과 앱 설치를 중단하세요. 금융회사 공식 대표번호로 사실을 확인하세요. 근거: 기관사칭형 보이스피싱 대응."
+        return "의심되는 통화를 즉시 종료하고 추가 송금과 앱 설치를 중단하세요. 금융회사 공식 대표번호로 사실을 확인하고 증거를 보관하세요."
 
     monkeypatch.setattr(graph, "call_ollama", fake_ollama)
     session_id = f"test-{uuid4()}"
@@ -104,7 +104,7 @@ def test_four_scenario_top1_hard_negative_and_recall() -> None:
 def test_safety_rejects_reasoning_code_and_non_korean_artifacts() -> None:
     risk = graph.analyze_risk("검찰이 안전계좌로 송금하라고 합니다.")
     documents = graph.retrieve_documents("검찰 안전계좌", risk["risk_type"])
-    base = "통화를 종료하고 송금을 중단한 뒤 금융회사 공식 대표번호로 확인하세요. 근거: 기관사칭형 보이스피싱 대응."
+    base = "통화를 종료하고 송금을 중단한 뒤 금융회사 공식 대표번호로 사실을 확인하고 관련 증거를 보관하세요."
     artifacts = {
         "<think>사고과정</think>": "no_prompt_artifacts",
         "<|assistant|>": "no_prompt_artifacts",
@@ -119,22 +119,21 @@ def test_safety_rejects_reasoning_code_and_non_korean_artifacts() -> None:
 def test_post_transfer_requires_all_three_emergency_actions() -> None:
     risk = graph.analyze_risk("이미 송금했습니다.")
     documents = graph.retrieve_documents("이미 송금했습니다.", risk["risk_type"])
-    citation = "근거: 보이스피싱 피해 직후 조치."
     incomplete_answers = [
-        f"이미 송금했다면 즉시 112에 신고하고 관련 자료를 보관하세요. {citation}",
-        f"이미 송금했다면 지급정지를 요청하고 관련 자료를 보관하세요. {citation}",
-        f"이미 송금했다면 금융회사에 연락하고 관련 자료를 보관하세요. {citation}",
-        f"이미 송금했다면 112와 금융회사에 연락하고 관련 자료를 보관하세요. {citation}",
+        "이미 송금했다면 추가 송금을 중단하고 즉시 112에 신고한 뒤 관련 자료를 보관하고 공식 안내를 확인하세요.",
+        "이미 송금했다면 추가 송금을 중단하고 지급정지를 요청한 뒤 관련 자료를 보관하고 공식 안내를 확인하세요.",
+        "이미 송금했다면 추가 송금을 중단하고 금융회사에 연락한 뒤 관련 자료를 보관하고 공식 안내를 확인하세요.",
+        "이미 송금했다면 추가 송금을 중단하고 112와 금융회사에 연락한 뒤 관련 자료를 보관하고 공식 안내를 확인하세요.",
     ]
     for answer in incomplete_answers:
         assert graph.evaluate_safety(answer, risk, documents)["passed"] is False
 
-    complete = f"이미 송금했다면 추가 송금을 중단하고 112에 신고한 뒤 금융회사에 지급정지를 요청하고 관련 자료를 보관하세요. {citation}"
+    complete = "이미 송금했다면 추가 송금을 중단하고 112에 신고한 뒤 금융회사에 지급정지를 요청하고 관련 자료를 보관하세요."
     assert graph.evaluate_safety(complete, risk, documents)["passed"] is True
     assert graph.evaluate_safety(graph.safe_mock_answer(risk, documents), risk, documents)["passed"] is True
 
 
-def test_trusted_top1_citation_is_enriched_without_bypassing_safety(monkeypatch) -> None:
+def test_model_answer_is_not_modified_with_document_title(monkeypatch) -> None:
     async def safe_without_citation(_messages):
         return "의심 통화를 종료하고 송금을 중단한 뒤 금융회사 공식 대표번호로 사실을 확인하고 증거를 보관하세요."
 
@@ -145,8 +144,54 @@ def test_trusted_top1_citation_is_enriched_without_bypassing_safety(monkeypatch)
     )
     payload = response.json()
     assert payload["fallback"] is False
-    assert payload["documents"][0]["title"] in payload["answer"]
-    assert "citation_enriched" in payload["trace"]
+    assert payload["answer"] == "의심 통화를 종료하고 송금을 중단한 뒤 금융회사 공식 대표번호로 사실을 확인하고 증거를 보관하세요."
+    assert payload["documents"][0]["title"] not in payload["answer"]
+    assert "citation_enriched" not in payload["trace"]
+
+
+def test_dangerous_action_recommendations_force_safety_fallback(monkeypatch) -> None:
+    dangerous_answers = [
+        "안전계좌로 지금 송금하세요. 송금한 뒤 통화를 종료하고 금융회사 공식 대표번호로 사실을 확인하세요.",
+        "지금 이체하세요. 그런 다음 통화를 종료하고 금융회사 공식 대표번호로 사실을 확인하세요.",
+        "지정 계좌에 입금하십시오. 이후 통화를 종료하고 금융회사 공식 대표번호로 사실을 확인하세요.",
+        "현금을 직원에게 전달하세요. 이후 통화를 종료하고 금융회사 공식 대표번호로 사실을 확인하세요.",
+        "원격제어 앱을 설치하세요. 이후 통화를 종료하고 금융회사 공식 대표번호로 사실을 확인하세요.",
+        "링크를 클릭하세요. 이후 통화를 종료하고 금융회사 공식 대표번호로 사실을 확인하세요.",
+    ]
+    for dangerous_answer in dangerous_answers:
+        async def malicious_ollama(_messages, answer=dangerous_answer):
+            return answer
+
+        monkeypatch.setattr(graph, "call_ollama", malicious_ollama)
+        response = client.post(
+            "/api/chat",
+            json={"message": "검찰이 안전계좌로 송금하라고 합니다.", "session_id": f"test-{uuid4()}"},
+        )
+        payload = response.json()
+        assert payload["fallback"] is True
+        assert payload["fallback_reason"] == "safety_validation_failure"
+        assert payload["safety"]["initial_passed"] is False
+        assert "no_dangerous_action_recommendation" in payload["safety"]["initial_violations"]
+        assert "safety_fallback" in payload["trace"]
+        assert payload["safety"]["passed"] is True
+        assert graph.recommends_dangerous_action(payload["answer"]) is False
+
+
+def test_negated_or_stopped_dangerous_actions_are_safe() -> None:
+    risk = graph.analyze_risk("검찰이 안전계좌로 송금하라고 합니다.")
+    documents = graph.retrieve_documents("검찰 안전계좌", risk["risk_type"])
+    safe_answers = [
+        "통화를 종료하고 송금하지 마세요. 금융회사 공식 대표번호로 사실을 확인하고 관련 증거를 보관하세요.",
+        "통화를 종료하고 이체를 중단하세요. 금융회사 공식 대표번호로 사실을 확인하고 관련 증거를 보관하세요.",
+        "통화를 종료하고 지정 계좌에 입금하지 마세요. 금융회사 공식 대표번호로 사실을 확인하고 증거를 보관하세요.",
+        "통화를 종료하고 현금을 직원에게 전달하지 마세요. 금융회사 공식 대표번호로 사실을 확인하고 증거를 보관하세요.",
+        "통화를 종료하고 원격제어 앱을 설치하지 마세요. 금융회사 공식 대표번호로 사실을 확인하고 증거를 보관하세요.",
+        "통화를 종료하고 링크를 클릭하지 마세요. 금융회사 공식 대표번호로 사실을 확인하고 관련 증거를 보관하세요.",
+    ]
+    for answer in safe_answers:
+        result = graph.evaluate_safety(answer, risk, documents)
+        assert result["checks"]["no_dangerous_action_recommendation"] is True
+        assert result["passed"] is True
 
 
 def test_rejects_blank_message_and_invalid_session_id() -> None:

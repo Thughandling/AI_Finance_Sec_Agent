@@ -278,21 +278,21 @@ export function retrieveAndRerank(query: string, riskType: string): RetrievalRes
     .slice(0, 3);
 }
 
-export function buildMockAnswer(result: DetectionResult, documents: RetrievalResult[], userText: string): string {
+export function buildMockAnswer(result: DetectionResult, _documents: RetrievalResult[], userText: string): string {
   const transferred = /이미.*(송금|이체)|보냈|입금했/.test(userText);
   if (transferred) {
-    return `이미 송금하셨다면 지금은 속도가 중요합니다. 추가 송금을 멈추고 112와 해당 금융회사에 직접 연락해 지급정지를 요청하세요. 이체내역·계좌번호·통화와 문자 기록도 보관해 주세요. 근거: ${documents[0]?.title ?? "피해 직후 대응 가이드"}.`;
+    return "이미 송금하셨다면 지금은 속도가 중요합니다. 추가 송금을 멈추고 112와 해당 금융회사에 직접 연락해 지급정지를 요청하세요. 이체내역·계좌번호·통화와 문자 기록도 보관해 주세요.";
   }
   if (result.verdict === "정상") {
-    return `현재 문장에서는 강한 사기 징후가 확인되지 않았습니다. 다만 상대가 송금이나 앱 설치를 새로 요구하면 중단하고, 공식 대표번호로 상담 내용을 다시 확인하세요. 근거: ${documents[0]?.title ?? "정상 금융상담 확인 기준"}.`;
+    return "현재 문장에서는 강한 사기 징후가 확인되지 않았습니다. 다만 상대가 송금이나 앱 설치를 새로 요구하면 중단하고, 공식 대표번호로 상담 내용을 다시 확인하세요.";
   }
-  return `현재 ${result.level} 단계입니다. ${result.evidence[0] ?? "복합 위험 신호"}가 확인됐습니다. 통화를 종료하고 송금·앱 설치를 중단한 뒤, 상대가 알려준 번호가 아닌 공식 대표번호로 확인하세요. 근거: ${documents[0]?.title ?? "공식 대응 가이드"}.`;
+  return `현재 ${result.level} 단계입니다. ${result.evidence[0] ?? "복합 위험 신호"}가 확인됐습니다. 통화를 종료하고 송금·앱 설치를 중단한 뒤, 상대가 알려준 번호가 아닌 공식 대표번호로 확인하세요.`;
 }
 
 export function verifyAnswer(answer: string, result: DetectionResult): { passed: boolean; checks: string[] } {
   const checks = [
     answer.length >= 40 ? "구체적 안내 포함" : "안내 부족",
-    /근거|확인|대표번호/.test(answer) ? "근거·확인 절차 포함" : "근거 절차 누락",
+    /확인|대표번호/.test(answer) ? "공식 확인 절차 포함" : "공식 확인 절차 누락",
     result.verdict === "정상" || /중단|종료|지급정지/.test(answer) ? "필수 행동 포함" : "필수 행동 누락",
     !/신고가 완료|지급정지 완료|처리되었습니다/.test(answer) ? "외부조치 허위 주장 없음" : "외부조치 허위 주장 감지",
   ];

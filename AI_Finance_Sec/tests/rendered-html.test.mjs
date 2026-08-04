@@ -28,7 +28,8 @@ test("renders the complete financial-safety demo", async () => {
   assert.match(html, /근거 기반 AI 금융 보안 비서/);
   assert.match(html, /SIMULATED DEMO FLOW/);
   assert.match(html, /Hard Negative/);
-  assert.match(html, /RRF reranked/);
+  assert.match(html, /서버가 선택한 검색 근거/);
+  assert.match(html, /규칙 기반 Safety 검사/);
   assert.match(html, /Mock/);
   assert.match(html, /SIMULATED DEMO FLOW/);
   assert.doesNotMatch(html, /Your site is taking shape|Building your site/);

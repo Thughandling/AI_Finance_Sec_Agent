@@ -301,7 +301,7 @@ export default function Home() {
           <div className="chat-header">
             <div className="assistant-avatar"><ShieldIcon /></div>
             <div><strong>보안 비서</strong><span><i /> {provider.label} · 멀티턴 세션</span></div>
-            <span className={`verifier ${verification?.passed ? "passed" : ""}`}>{isOllamaActual && localCallError ? "호출 실패 폴백" : isOllamaActual && lastGraphRun?.fallback ? fallbackLabel(lastGraphRun) : verification?.passed ? "Safety 검증 통과" : "Safety 검증 대기"}</span>
+            <span className={`verifier ${verification?.passed ? "passed" : ""}`}>{isOllamaActual && localCallError ? "호출 실패 폴백" : isOllamaActual && lastGraphRun?.fallback ? fallbackLabel(lastGraphRun) : verification?.passed ? "규칙 기반 Safety 검사 통과" : "규칙 기반 Safety 검사 대기"}</span>
           </div>
           {isOllamaActual && <div className="graph-run-meta" data-testid="actual-graph-meta">
             {lastGraphRun ? <><span>session {lastGraphRun.session_id}</span><span>turn {lastGraphRun.turn_count}</span><span>{fallbackLabel(lastGraphRun)}</span>{lastGraphRun.generation_error && <span title={lastGraphRun.generation_error}>원인: {lastGraphRun.generation_error}</span>}</> : <span>{localCallError ? `호출 실패 폴백 · ${localCallError}` : "로컬 LangGraph 응답 대기"}</span>}
@@ -334,7 +334,7 @@ export default function Home() {
           </div>
 
           {isOllamaActual ? <>
-            <div className="section-title"><h3>Safety 상세</h3><span>{lastGraphRun?.safety?.passed ? "통과" : "대기"}</span></div>
+            <div className="section-title"><h3>규칙 기반 Safety 검사</h3><span>{lastGraphRun?.safety?.passed ? "통과" : "대기"}</span></div>
             <div className="safety-detail" data-testid="actual-safety-detail">
               {lastGraphRun?.safety ? Object.entries(lastGraphRun.safety.checks).map(([name, passed]) => <span key={name} className={passed ? "passed" : "failed"}>{passed ? "✓" : "!"} {name}</span>) : <span>FastAPI 검증 결과 대기</span>}
             </div>
@@ -345,7 +345,7 @@ export default function Home() {
             </div>
           </>}
 
-          <div className="section-title"><h3>RAG 근거 Top 3</h3><span>RRF reranked</span></div>
+          <div className="section-title"><h3>서버가 선택한 검색 근거</h3><span>RRF Top 3</span></div>
           <div className="source-list">
             {displayedDocuments.length > 0 ? displayedDocuments.map((document, index) => <a href={document.sourceUrl} target="_blank" rel="noreferrer" className="source-item" key={document.id}><i>{index + 1}</i><span><strong>{document.title}</strong><small>{document.authority} · {document.id}</small></span><b>↗</b></a>) : <div className="source-empty">FastAPI 근거 문서 대기</div>}
           </div>

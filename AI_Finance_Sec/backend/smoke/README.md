@@ -27,6 +27,7 @@ backend/.venv/bin/python backend/scripts/smoke_ollama.py
 - 두 응답 모두 `fallback=false`
 - `turn_count` 1 → 2
 - Safety 통과
+- 위험행동 권고 없음 규칙 통과
 - 필수 LangGraph trace 전체 포함
 - 피해발생 최종 답변의 `112`, `금융회사`, `지급정지` 의미가 모두 존재
 

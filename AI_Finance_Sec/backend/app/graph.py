@@ -162,13 +162,12 @@ def recommend_policy(risk: dict[str, Any]) -> dict[str, Any]:
     return {"actions": actions, "external_action_executed": False}
 
 
-def safe_mock_answer(risk: dict[str, Any], documents: list[dict[str, Any]]) -> str:
-    source = documents[0]["title"] if documents else "공식 금융안전 가이드"
+def safe_mock_answer(risk: dict[str, Any], _documents: list[dict[str, Any]]) -> str:
     if risk["already_transferred"]:
-        return f"이미 송금했다면 추가 송금을 즉시 중단하고 112와 해당 금융회사 공식 대표번호에 직접 연락해 지급정지를 요청하세요. 이체내역·계좌번호·통화와 문자 기록을 보관하세요. 근거: {source}. 실제 신고나 지급정지는 사용자가 직접 요청해야 합니다."
+        return "이미 송금했다면 추가 송금을 즉시 중단하고 112와 해당 금융회사 공식 대표번호에 직접 연락해 지급정지를 요청하세요. 이체내역·계좌번호·통화와 문자 기록을 보관하세요. 실제 신고나 지급정지는 사용자가 직접 요청해야 합니다."
     if risk["verdict"] == "사기":
-        return f"현재 {risk['level']} 단계로 판단됩니다. 통화를 종료하고 송금·앱 설치를 중단하세요. 상대가 알려준 번호가 아닌 금융회사 공식 대표번호로 사실을 확인하고 증거를 보관하세요. 근거: {source}. 실제 외부 조치는 실행하지 않았습니다."
-    return f"현재 문장에서는 강한 사기 징후가 확인되지 않았습니다. 다만 송금이나 앱 설치를 새로 요구하면 중단하고 금융회사 공식 대표번호로 다시 확인하세요. 근거: {source}."
+        return f"현재 {risk['level']} 단계로 판단됩니다. 통화를 종료하고 송금·앱 설치를 중단하세요. 상대가 알려준 번호가 아닌 금융회사 공식 대표번호로 사실을 확인하고 증거를 보관하세요. 실제 외부 조치는 실행하지 않았습니다."
+    return "현재 문장에서는 강한 사기 징후가 확인되지 않았습니다. 다만 송금이나 앱 설치를 새로 요구하면 중단하고 금융회사 공식 대표번호로 다시 확인하세요."
 
 
 async def call_ollama(messages: list[dict[str, str]]) -> str:
@@ -239,24 +238,13 @@ async def generate_answer(state: ChatState) -> dict[str, Any]:
             "통화 종료, 추가 송금·앱 설치 중단, 공식 대표번호 확인을 우선한다. "
             "실제로 신고·지급정지·송금취소를 완료했다고 주장하지 않는다. "
             "한국어 외 문자, 역할명, 사고과정, JSON, 코드, 번역문을 출력하지 않는다. "
-            "답변 마지막에는 제공된 첫 번째 문서 제목을 그대로 사용해 '근거: 문서 제목.' 형식으로 쓴다.\n"
             f"사건 컨텍스트: {state['analysis_input']}\n위험 분석: {state['risk']}\n"
-            f"근거 문서: {state['documents']}\n허용 정책: {state['policy']}"
+            f"검색 문서: {state['documents']}\n허용 정책: {state['policy']}"
         ),
     }
     try:
         answer = await call_ollama([system, *history])
-        trace = ["ollama_generate"]
-        allowed_citations = [
-            str(value)
-            for document in state["documents"]
-            for value in (document.get("title"), document.get("id"))
-            if value
-        ]
-        if allowed_citations and not any(citation in answer for citation in allowed_citations):
-            answer = f"{answer.rstrip()}\n근거: {state['documents'][0]['title']}."
-            trace.append("citation_enriched")
-        return {"draft_answer": answer, "fallback": False, "generation_error": None, "trace": trace}
+        return {"draft_answer": answer, "fallback": False, "generation_error": None, "trace": ["ollama_generate"]}
     except Exception as exc:
         return {
             "draft_answer": safe_mock_answer(state["risk"], state["documents"]),
@@ -266,18 +254,24 @@ async def generate_answer(state: ChatState) -> dict[str, Any]:
         }
 
 
-def evaluate_safety(answer: str, risk: dict[str, Any], documents: list[dict[str, Any]]) -> dict[str, Any]:
-    dangerous = risk["verdict"] == "사기"
+def recommends_dangerous_action(answer: str) -> bool:
+    action_commands = (
+        r"(?:송금|이체|입금)(?:을|를)?\s*(?:하(?:세요|십시오|라|도록\s*하세요|면\s*됩니다|는\s*것이\s*좋습니다)|해(?:요|주세요|야\s*합니다)|진행하세요)",
+        r"(?:돈|금액|자금)(?:을|를)?\s*(?:보내(?:세요|십시오|라|주세요)|송금하세요|이체하세요)",
+        r"현금.{0,24}전달(?:을|를)?\s*(?:하(?:세요|십시오|라)|해(?:요|주세요|야\s*합니다))",
+        r"(?:원격\s*제어\s*)?앱(?:을|를)?\s*설치(?:를)?\s*(?:하(?:세요|십시오|라)|해(?:요|주세요|야\s*합니다))",
+        r"링크(?:를|을)?\s*(?:클릭|누르|접속)(?:하)?(?:세요|십시오|라|해요|해주세요)",
+    )
+    return any(re.search(pattern, answer) for pattern in action_commands)
+
+
+def evaluate_safety(answer: str, risk: dict[str, Any], _documents: list[dict[str, Any]]) -> dict[str, Any]:
+    dangerous = risk["verdict"] == "사기" or risk["level"] == "위험" or risk["already_transferred"]
     transferred = risk["already_transferred"]
-    allowed_citations = [
-        str(value)
-        for document in documents
-        for value in (document.get("title"), document.get("id"))
-        if value
-    ]
     checks = {
         "minimum_length": len(answer.strip()) >= 40,
         "risk_stop_action": (not dangerous) or bool(re.search(r"중단|종료|끊", answer)),
+        "no_dangerous_action_recommendation": (not dangerous) or not recommends_dangerous_action(answer),
         "official_verification": bool(re.search(r"공식|대표번호|금융회사|경찰청|금융감독원", answer)),
         "post_transfer_police_112": (not transferred) or bool(re.search(r"112|경찰(?:청)?", answer)),
         "post_transfer_financial_company": (not transferred) or bool(re.search(r"금융\s*회사|금융\s*기관|은행|카드사", answer)),
@@ -288,8 +282,6 @@ def evaluate_safety(answer: str, risk: dict[str, Any], documents: list[dict[str,
             re.search(r"(?i)<\/?think>|<\|(?:system|assistant|user)\|>|\b(system|assistant|user)\b|번역|翻译|translate", answer)
         ),
         "no_code_or_json": not bool(re.search(r"```|^\s*[\{\[]", answer)),
-        "documents_present": bool(documents),
-        "citation_matches_document": bool(allowed_citations) and any(citation in answer for citation in allowed_citations),
     }
     return {"passed": all(checks.values()), "checks": checks, "violations": [name for name, passed in checks.items() if not passed]}
 

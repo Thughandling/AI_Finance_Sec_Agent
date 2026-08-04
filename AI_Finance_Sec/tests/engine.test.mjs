@@ -60,6 +60,9 @@ test("renders actual graph state from the FastAPI response and resets local sess
   assert.match(page, /setLastGraphRun\(null\)/);
   assert.match(page, /actual-risk-panel/);
   assert.match(page, /data-testid="actual-safety-detail"/);
+  assert.match(page, /규칙 기반 Safety 검사/);
+  assert.match(page, /서버가 선택한 검색 근거/);
+  assert.doesNotMatch(page, /RAG 근거 Top 3/);
 });
 
 test("distinguishes local Qwen from Qwen Cloud and times out cloud providers", async () => {

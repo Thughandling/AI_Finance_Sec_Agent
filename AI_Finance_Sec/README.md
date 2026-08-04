@@ -7,8 +7,8 @@
 - API 키 없이 끝까지 재현되는 결정론적 Mock 데모
 - Ollama Local(Qwen 2.5 7B)과 OpenAI, DeepSeek, Claude, Gemini, Qwen Cloud BYOK 모델 라우터
 - 기관 사칭·대출 사기·가족 빙자·정상 Hard Negative 합성 시나리오
-- State → 병렬 탐지 → RAG → RRF 리랭킹 → 모델 생성 → 안전 검증 흐름
-- 통화·거래 결합 위험도, 근거 Top 3, 정탐·오탐·미탐 표시
+- State → 병렬 탐지 → RAG → RRF 리랭킹 → 모델 생성 → 규칙 기반 Safety 검사 흐름
+- 통화·거래 결합 위험도, 서버가 선택한 검색 근거 Top 3, 정탐·오탐·미탐 표시
 - 8개 회귀 검증셋과 Macro F1/Recall 요약
 
 ## 로컬 실행
@@ -24,7 +24,7 @@ npm run dev
 
 ## Ollama Local + 실제 LangGraph 데모
 
-Ollama Local은 Qwen Cloud(DashScope)와 다른 실행 경로입니다. API 키 없이 사용자의 Mac에서 `qwen2.5:7b`를 실행하며, FastAPI 내부의 실제 LangGraph가 입력 → 병렬 위험분석·지식검색·정책 → 모델 생성 → Safety 검증 → finalize를 수행합니다.
+Ollama Local은 Qwen Cloud(DashScope)와 다른 실행 경로입니다. API 키 없이 사용자의 Mac에서 `qwen2.5:7b`를 실행하며, FastAPI 내부의 실제 LangGraph가 입력 → 병렬 위험분석·지식검색·정책 → 모델 생성 → 규칙 기반 Safety 검사 → finalize를 수행합니다. 응답의 `documents`와 UI 패널은 서버가 선택한 검색 근거를 보여주며, 답변 문장과 문서 사이의 의미적 함의나 공식 인용 정확성을 검증했다는 뜻은 아닙니다.
 
 최초 한 번 모델을 준비합니다.
 
@@ -64,7 +64,7 @@ npm run dev
 
 웹 설정에서 `Ollama Local`을 선택합니다. 기본값은 `OLLAMA_BASE_URL=http://127.0.0.1:11434`, `OLLAMA_MODEL=qwen2.5:7b`, timeout 45초이며 필요하면 FastAPI 실행 전에 환경변수로 변경할 수 있습니다. 프론트 프록시의 백엔드 주소는 `FASTAPI_BASE_URL`로 변경합니다.
 
-FastAPI의 `InMemorySaver`는 데모용 프로세스 메모리입니다. `session_id`별 멀티턴은 지원하지만 서버를 재시작하면 사라집니다. 112 신고나 지급정지는 실제 실행하지 않습니다. Ollama가 중단되거나 Safety 검증에 실패하면 응답과 UI에 `Mock Safety Fallback`을 표시합니다.
+FastAPI의 `InMemorySaver`는 데모용 프로세스 메모리입니다. `session_id`별 멀티턴은 지원하지만 서버를 재시작하면 사라집니다. 112 신고나 지급정지는 실제 실행하지 않습니다. Ollama가 중단되거나 규칙 기반 Safety 검사에 실패하면 응답과 UI에 `Mock Safety Fallback`을 표시합니다.
 
 공개 배포 서버는 사용자 PC의 localhost Ollama에 접근할 수 없습니다. Ollama 시연은 위 로컬 3개 프로세스 구성으로 실행하고, 공개 URL에서는 Mock 또는 클라우드 BYOK를 사용합니다. 클라우드 키는 저장하지 않지만 Next 서버 프록시를 경유하므로 제한된 촬영용 키를 이용한 로컬 시연을 권장합니다.
 
