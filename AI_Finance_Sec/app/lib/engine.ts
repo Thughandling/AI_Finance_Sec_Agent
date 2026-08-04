@@ -324,4 +324,4 @@ export function calculateEvaluation() {
   return { total: rows.length, tp, tn, fp, fn, precision, recall, f1, macroF1: (f1 + normalF1) / 2, rows };
 }
 
-export const pipelineSteps = ["입력 검증", "State", "병렬 탐지", "RAG 검색", "RRF 리랭킹", "모델 생성", "안전 검증"];
+export const pipelineSteps = ["입력 검증", "State", "병렬 탐지", "RAG 검색", "RRF 리랭킹", "Qwen 분석", "정책 보호·Safety"];

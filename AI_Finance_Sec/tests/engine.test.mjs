@@ -62,6 +62,10 @@ test("renders actual graph state from the FastAPI response and resets local sess
   assert.match(page, /data-testid="actual-safety-detail"/);
   assert.match(page, /규칙 기반 Safety 검사/);
   assert.match(page, /서버가 선택한 검색 근거/);
+  assert.match(page, /정책 보호 응답\(Qwen 분석 \+ 서버 허용행동\)/);
+  assert.match(page, /response_mode/);
+  assert.match(page, /policy_guardrail_applied/);
+  assert.match(page, /llm_invoked/);
   assert.doesNotMatch(page, /RAG 근거 Top 3/);
 });
 

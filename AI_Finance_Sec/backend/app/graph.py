@@ -89,9 +89,13 @@ class ChatState(TypedDict, total=False):
     draft_answer: str
     final_answer: str
     safety: dict[str, Any]
+    initial_safety: dict[str, Any]
     provider: str
     model: str
     fallback: bool
+    response_mode: str
+    llm_invoked: bool
+    policy_guardrail_applied: bool
     generation_error: str | None
     turn_count: int
     trace: Annotated[list[str], operator.add]
@@ -162,11 +166,32 @@ def recommend_policy(risk: dict[str, Any]) -> dict[str, Any]:
     return {"actions": actions, "external_action_executed": False}
 
 
-def safe_mock_answer(risk: dict[str, Any], _documents: list[dict[str, Any]]) -> str:
-    if risk["already_transferred"]:
-        return "이미 송금했다면 추가 송금을 즉시 중단하고 112와 해당 금융회사 공식 대표번호에 직접 연락해 지급정지를 요청하세요. 이체내역·계좌번호·통화와 문자 기록을 보관하세요. 실제 신고나 지급정지는 사용자가 직접 요청해야 합니다."
+POLICY_ACTION_ALLOWLIST = (
+    "통화 즉시 종료",
+    "추가 송금·앱 설치 중단",
+    "통화·문자·계좌 증거 보관",
+    "공식 대표번호·앱에서 사실 확인",
+    "112 상담·신고",
+    "금융회사 콜센터에 지급정지 요청",
+)
+
+
+def guarded_policy_answer(risk: dict[str, Any], policy: dict[str, Any], documents: list[dict[str, Any]]) -> str:
+    allowed_actions = [action for action in policy.get("actions", []) if action in POLICY_ACTION_ALLOWLIST]
+    if not allowed_actions:
+        allowed_actions = ["공식 대표번호·앱에서 사실 확인"]
+    action_lines = "\n".join(f"- {action}" for action in allowed_actions)
+    return (
+        f"서버 위험 판정: {risk['level']} · {risk['risk_type']}.\n"
+        f"허용된 사용자 행동:\n{action_lines}\n"
+        f"서버가 선택한 검색 근거 {len(documents)}건은 별도 패널에서 확인하세요. "
+        "실제 신고나 지급정지는 사용자가 직접 요청해야 합니다."
+    )
+
+
+def safe_mock_answer(risk: dict[str, Any], documents: list[dict[str, Any]]) -> str:
     if risk["verdict"] == "사기":
-        return f"현재 {risk['level']} 단계로 판단됩니다. 통화를 종료하고 송금·앱 설치를 중단하세요. 상대가 알려준 번호가 아닌 금융회사 공식 대표번호로 사실을 확인하고 증거를 보관하세요. 실제 외부 조치는 실행하지 않았습니다."
+        return guarded_policy_answer(risk, recommend_policy(risk), documents)
     return "현재 문장에서는 강한 사기 징후가 확인되지 않았습니다. 다만 송금이나 앱 설치를 새로 요구하면 중단하고 금융회사 공식 대표번호로 다시 확인하세요."
 
 
@@ -244,11 +269,48 @@ async def generate_answer(state: ChatState) -> dict[str, Any]:
     }
     try:
         answer = await call_ollama([system, *history])
-        return {"draft_answer": answer, "fallback": False, "generation_error": None, "trace": ["ollama_generate"]}
+        initial = evaluate_safety(answer, state["risk"], state["documents"])
+        guarded = state["risk"]["verdict"] == "사기" or state["risk"]["already_transferred"]
+        if guarded:
+            return {
+                "draft_answer": guarded_policy_answer(state["risk"], state["policy"], state["documents"]),
+                "initial_safety": initial,
+                "fallback": False,
+                "response_mode": "guarded_policy",
+                "llm_invoked": True,
+                "policy_guardrail_applied": True,
+                "generation_error": None,
+                "trace": ["ollama_generate", "policy_guardrail"],
+            }
+        if initial["passed"]:
+            return {
+                "draft_answer": answer,
+                "initial_safety": initial,
+                "fallback": False,
+                "response_mode": "llm_verified",
+                "llm_invoked": True,
+                "policy_guardrail_applied": False,
+                "generation_error": None,
+                "trace": ["ollama_generate", "llm_verified"],
+            }
+        return {
+            "draft_answer": safe_mock_answer(state["risk"], state["documents"]),
+            "initial_safety": initial,
+            "fallback": True,
+            "response_mode": "mock_fallback",
+            "llm_invoked": True,
+            "policy_guardrail_applied": False,
+            "generation_error": None,
+            "trace": ["ollama_generate", "llm_validation_failed"],
+        }
     except Exception as exc:
         return {
             "draft_answer": safe_mock_answer(state["risk"], state["documents"]),
+            "initial_safety": {"passed": False, "checks": {}, "violations": ["ollama_call_failure"]},
             "fallback": True,
+            "response_mode": "mock_fallback",
+            "llm_invoked": True,
+            "policy_guardrail_applied": False,
             "generation_error": f"{type(exc).__name__}: {str(exc)[:180]}",
             "trace": ["ollama_generate_failed", "mock_generation_fallback"],
         }
@@ -271,7 +333,7 @@ def evaluate_safety(answer: str, risk: dict[str, Any], _documents: list[dict[str
     checks = {
         "minimum_length": len(answer.strip()) >= 40,
         "risk_stop_action": (not dangerous) or bool(re.search(r"중단|종료|끊", answer)),
-        "no_dangerous_action_recommendation": (not dangerous) or not recommends_dangerous_action(answer),
+        "no_dangerous_action_recommendation": not recommends_dangerous_action(answer),
         "official_verification": bool(re.search(r"공식|대표번호|금융회사|경찰청|금융감독원", answer)),
         "post_transfer_police_112": (not transferred) or bool(re.search(r"112|경찰(?:청)?", answer)),
         "post_transfer_financial_company": (not transferred) or bool(re.search(r"금융\s*회사|금융\s*기관|은행|카드사", answer)),
@@ -287,19 +349,26 @@ def evaluate_safety(answer: str, risk: dict[str, Any], _documents: list[dict[str
 
 
 def safety_verifier(state: ChatState) -> dict[str, Any]:
-    initial = evaluate_safety(state["draft_answer"], state["risk"], state["documents"])
+    initial = state["initial_safety"]
     final_answer = state["draft_answer"]
     fallback = bool(state.get("fallback"))
-    if not initial["passed"]:
+    response_mode = state["response_mode"]
+    policy_guardrail_applied = bool(state["policy_guardrail_applied"])
+    final = evaluate_safety(final_answer, state["risk"], state["documents"])
+    if not final["passed"]:
         final_answer = safe_mock_answer(state["risk"], state["documents"])
         fallback = True
-    final = evaluate_safety(final_answer, state["risk"], state["documents"])
+        response_mode = "mock_fallback"
+        policy_guardrail_applied = False
+        final = evaluate_safety(final_answer, state["risk"], state["documents"])
     trace = ["safety_verifier"]
-    if not initial["passed"]:
+    if response_mode == "mock_fallback":
         trace.append("safety_fallback")
     return {
         "final_answer": final_answer,
         "fallback": fallback,
+        "response_mode": response_mode,
+        "policy_guardrail_applied": policy_guardrail_applied,
         "safety": {
             "passed": final["passed"],
             "checks": final["checks"],
@@ -307,6 +376,7 @@ def safety_verifier(state: ChatState) -> dict[str, Any]:
             "initial_passed": initial["passed"],
             "initial_violations": initial["violations"],
             "fallback_applied": fallback,
+            "policy_guardrail_applied": policy_guardrail_applied,
         },
         "trace": trace,
     }
@@ -358,11 +428,13 @@ async def run_chat(message: str, session_id: str) -> dict[str, Any]:
         "provider": result["provider"],
         "model": result["model"],
         "fallback": bool(result["fallback"]),
+        "response_mode": result["response_mode"],
+        "llm_invoked": bool(result["llm_invoked"]),
+        "policy_guardrail_applied": bool(result["policy_guardrail_applied"]),
         "fallback_reason": (
             "ollama_call_failure"
             if result.get("generation_error")
-            else "safety_validation_failure"
-            if not result["safety"]["initial_passed"]
+            else "safety_validation_failure" if result["response_mode"] == "mock_fallback"
             else None
         ),
         "generation_error": result.get("generation_error"),

@@ -28,6 +28,9 @@ type LocalGraphResponse = {
   model?: string;
   trace?: string[];
   fallback?: boolean;
+  response_mode?: "guarded_policy" | "llm_verified" | "mock_fallback";
+  llm_invoked?: boolean;
+  policy_guardrail_applied?: boolean;
   fallback_reason?: "ollama_call_failure" | "safety_validation_failure" | null;
   generation_error?: string | null;
   session_id?: string;
@@ -55,6 +58,7 @@ type LocalGraphResponse = {
     initial_passed: boolean;
     initial_violations: string[];
     fallback_applied: boolean;
+    policy_guardrail_applied: boolean;
   };
 };
 
@@ -119,6 +123,13 @@ export default function Home() {
   function fallbackLabel(run: LocalGraphResponse | null) {
     if (!run?.fallback) return "폴백 없음";
     return run.fallback_reason === "ollama_call_failure" ? "호출 실패 폴백" : "Qwen 출력 검증 실패 폴백";
+  }
+
+  function responseModeLabel(run: LocalGraphResponse | null) {
+    if (run?.response_mode === "guarded_policy") return "정책 보호 응답(Qwen 분석 + 서버 허용행동)";
+    if (run?.response_mode === "llm_verified") return "검증된 Qwen 응답";
+    if (run?.response_mode === "mock_fallback") return fallbackLabel(run);
+    return fallbackLabel(run);
   }
 
   useEffect(() => {
@@ -212,7 +223,7 @@ export default function Home() {
       setMessages((previous) => [...previous, {
         role: "assistant",
         text: safeAnswer,
-        model: data.fallback ? fallbackLabel(data) : !check.passed ? "클라이언트 Safety 폴백" : data.model ?? provider.model,
+        model: providerId === "ollama" ? responseModeLabel(data) : data.fallback ? fallbackLabel(data) : !check.passed ? "클라이언트 Safety 폴백" : data.model ?? provider.model,
         actions: providerId === "ollama" ? data.risk?.verdict === "사기" : currentDetection.verdict === "사기",
         fallback: Boolean(data.fallback) || !check.passed,
       }]);
@@ -301,10 +312,10 @@ export default function Home() {
           <div className="chat-header">
             <div className="assistant-avatar"><ShieldIcon /></div>
             <div><strong>보안 비서</strong><span><i /> {provider.label} · 멀티턴 세션</span></div>
-            <span className={`verifier ${verification?.passed ? "passed" : ""}`}>{isOllamaActual && localCallError ? "호출 실패 폴백" : isOllamaActual && lastGraphRun?.fallback ? fallbackLabel(lastGraphRun) : verification?.passed ? "규칙 기반 Safety 검사 통과" : "규칙 기반 Safety 검사 대기"}</span>
+            <span className={`verifier ${verification?.passed ? "passed" : ""}`}>{isOllamaActual && localCallError ? "호출 실패 폴백" : isOllamaActual && lastGraphRun?.response_mode === "guarded_policy" ? "정책 보호 응답(Qwen 분석 + 서버 허용행동)" : isOllamaActual && lastGraphRun?.fallback ? fallbackLabel(lastGraphRun) : verification?.passed ? "규칙 기반 Safety 검사 통과" : "규칙 기반 Safety 검사 대기"}</span>
           </div>
           {isOllamaActual && <div className="graph-run-meta" data-testid="actual-graph-meta">
-            {lastGraphRun ? <><span>session {lastGraphRun.session_id}</span><span>turn {lastGraphRun.turn_count}</span><span>{fallbackLabel(lastGraphRun)}</span>{lastGraphRun.generation_error && <span title={lastGraphRun.generation_error}>원인: {lastGraphRun.generation_error}</span>}</> : <span>{localCallError ? `호출 실패 폴백 · ${localCallError}` : "로컬 LangGraph 응답 대기"}</span>}
+            {lastGraphRun ? <><span>session {lastGraphRun.session_id}</span><span>turn {lastGraphRun.turn_count}</span><span>{responseModeLabel(lastGraphRun)}</span><span>LLM 호출 {lastGraphRun.llm_invoked ? "예" : "아니요"}</span><span>정책 가드 {lastGraphRun.policy_guardrail_applied ? "적용" : "미적용"}</span>{lastGraphRun.generation_error && <span title={lastGraphRun.generation_error}>원인: {lastGraphRun.generation_error}</span>}</> : <span>{localCallError ? `호출 실패 폴백 · ${localCallError}` : "로컬 LangGraph 응답 대기"}</span>}
           </div>}
           <div className="chat-body">
             {messages.map((message, index) => (

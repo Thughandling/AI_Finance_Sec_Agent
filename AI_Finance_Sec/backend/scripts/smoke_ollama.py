@@ -7,6 +7,7 @@ import json
 import os
 import platform
 from datetime import datetime, timezone
+from urllib.parse import urlparse
 
 import httpx
 
@@ -19,6 +20,7 @@ REQUIRED_TRACE = {
     "knowledge_agent",
     "policy_agent",
     "ollama_generate",
+    "policy_guardrail",
     "safety_verifier",
     "finalize",
 }
@@ -34,6 +36,9 @@ def sanitise(payload: dict) -> dict:
         "model": payload.get("model"),
         "fallback": payload.get("fallback"),
         "fallback_reason": payload.get("fallback_reason"),
+        "response_mode": payload.get("response_mode"),
+        "llm_invoked": payload.get("llm_invoked"),
+        "policy_guardrail_applied": payload.get("policy_guardrail_applied"),
         "risk": {
             "score": payload.get("risk", {}).get("score"),
             "level": payload.get("risk", {}).get("level"),
@@ -62,6 +67,10 @@ def main() -> None:
         "검찰 수사관이 안전계좌로 지금 즉시 송금하라고 합니다. 어떻게 해야 하나요?",
         "그 계좌로 보내도 돼요?",
     ]
+    api_port = urlparse(BASE_URL).port or 8000
+    smoke_command = "backend/.venv/bin/python backend/scripts/smoke_ollama.py"
+    if BASE_URL != "http://127.0.0.1:8000":
+        smoke_command = f"AI_FINANCE_SEC_API_URL={BASE_URL} {smoke_command}"
 
     with httpx.Client(timeout=TIMEOUT_SECONDS) as client:
         health = client.get(f"{BASE_URL}/health")
@@ -73,6 +82,9 @@ def main() -> None:
             payload = response.json()
             assert payload["model"] == "qwen2.5:7b", payload
             assert payload["fallback"] is False, payload
+            assert payload["response_mode"] == "guarded_policy", payload
+            assert payload["llm_invoked"] is True, payload
+            assert payload["policy_guardrail_applied"] is True, payload
             assert payload["turn_count"] == expected_turn, payload
             assert REQUIRED_TRACE.issubset(payload["trace"]), payload
             assert payload["safety"]["passed"] is True, payload
@@ -87,9 +99,26 @@ def main() -> None:
         victim_payload = victim_response.json()
         victim_result = sanitise(victim_payload)
         assert victim_payload["risk"]["already_transferred"] is True, victim_payload
+        assert victim_payload["fallback"] is False, victim_payload
+        assert victim_payload["response_mode"] == "guarded_policy", victim_payload
+        assert victim_payload["llm_invoked"] is True, victim_payload
+        assert victim_payload["policy_guardrail_applied"] is True, victim_payload
         assert victim_payload["safety"]["passed"] is True, victim_payload
         assert victim_payload["safety"]["checks"]["no_dangerous_action_recommendation"] is True, victim_payload
         assert all(victim_result["required_actions"].values()), victim_payload
+
+        normal_response = client.post(
+            f"{BASE_URL}/api/chat",
+            json={"message": "오늘 은행 영업시간과 공식 대표번호 확인 방법을 알려주세요.", "session_id": f"{session_id}-normal"},
+        )
+        normal_response.raise_for_status()
+        normal_payload = normal_response.json()
+        normal_result = sanitise(normal_payload)
+        assert normal_payload["risk"]["verdict"] == "정상", normal_payload
+        assert normal_payload["llm_invoked"] is True, normal_payload
+        assert normal_payload["policy_guardrail_applied"] is False, normal_payload
+        assert normal_payload["response_mode"] in {"llm_verified", "mock_fallback"}, normal_payload
+        assert normal_payload["safety"]["passed"] is True, normal_payload
 
     result = {
         "generated_at_utc": generated_at.isoformat(),
@@ -101,14 +130,18 @@ def main() -> None:
         },
         "commands": [
             "ollama serve",
-            "uvicorn backend.main:app --host 127.0.0.1 --port 8000",
-            "backend/.venv/bin/python backend/scripts/smoke_ollama.py",
+            f"uvicorn backend.main:app --host 127.0.0.1 --port {api_port}",
+            smoke_command,
         ],
-        "assertions": "same session 2-turn fallback=false, full trace, no dangerous action recommendation; victim final safety has 112+financial company+payment stop",
+        "assertions": "risky 2-turn and victim use guarded_policy with Qwen invoked, policy guardrail, fallback=false; victim has 112+financial company+payment stop",
         "turns": turns,
         "victim_case": {
             "request": {"message": "이미 송금했습니다. 무엇부터 해야 하나요?"},
             "response": victim_result,
+        },
+        "normal_case": {
+            "request": {"message": "오늘 은행 영업시간과 공식 대표번호 확인 방법을 알려주세요."},
+            "response": normal_result,
         },
     }
     print(json.dumps(result, ensure_ascii=False, indent=2))

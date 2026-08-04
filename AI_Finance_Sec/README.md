@@ -24,7 +24,9 @@ npm run dev
 
 ## Ollama Local + 실제 LangGraph 데모
 
-Ollama Local은 Qwen Cloud(DashScope)와 다른 실행 경로입니다. API 키 없이 사용자의 Mac에서 `qwen2.5:7b`를 실행하며, FastAPI 내부의 실제 LangGraph가 입력 → 병렬 위험분석·지식검색·정책 → 모델 생성 → 규칙 기반 Safety 검사 → finalize를 수행합니다. 응답의 `documents`와 UI 패널은 서버가 선택한 검색 근거를 보여주며, 답변 문장과 문서 사이의 의미적 함의나 공식 인용 정확성을 검증했다는 뜻은 아닙니다.
+Ollama Local은 Qwen Cloud(DashScope)와 다른 실행 경로입니다. API 키 없이 사용자의 Mac에서 `qwen2.5:7b`를 실행하며, FastAPI 내부의 실제 LangGraph가 입력 → 병렬 위험분석·지식검색·정책 → Qwen 분석 → 정책 보호/규칙 기반 Safety 검사 → finalize를 수행합니다. 위험·피해 판정에서는 Qwen 원문을 사용자에게 노출하지 않고 서버 허용행동만으로 결정론적 `guarded_policy` 응답을 구성합니다. 정상 판정에서만 Qwen 문장이 규칙 검사를 통과하면 `llm_verified`로 사용되며, 호출 또는 검사 실패는 `mock_fallback`입니다.
+
+따라서 위험 응답은 **Qwen 분석 + 결정론적 정책 응답**이며 Qwen이 최종 사용자 행동을 생성했다는 뜻이 아닙니다. 응답의 `documents`와 UI 패널은 서버가 선택한 검색 근거를 보여주며, 답변 문장과 문서 사이의 의미적 함의나 공식 인용 정확성을 검증했다는 뜻도 아닙니다. API 응답은 `response_mode`, `llm_invoked`, `policy_guardrail_applied`로 이 구분을 명시합니다.
 
 최초 한 번 모델을 준비합니다.
 
