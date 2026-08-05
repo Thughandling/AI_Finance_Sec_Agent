@@ -73,7 +73,7 @@ def test_ollama_failure_returns_explicit_safe_fallback(monkeypatch) -> None:
 
 def test_safety_verifier_replaces_unsafe_model_answer(monkeypatch) -> None:
     async def unsafe_ollama(_messages):
-        return "통화를 종료하고 공식 대표번호와 112에 연락해 지급정지를 요청하세요. assistant 翻译成中文。"
+        return "통화를 종료하고 1394와 공식 대표번호에 연락하며 긴급 시 112에 신고하고 금융회사에 지급정지를 요청하세요. assistant 翻译成中文。"
 
     monkeypatch.setattr(graph, "call_ollama", unsafe_ollama)
     response = client.post("/api/chat", json={"message": "이미 송금했어요.", "session_id": f"test-{uuid4()}"})
@@ -90,6 +90,8 @@ def test_safety_verifier_replaces_unsafe_model_answer(monkeypatch) -> None:
     assert "safety_fallback" not in payload["trace"]
     assert payload["fallback_reason"] is None
     assert payload["safety"]["passed"] is True
+    assert "1394" in payload["answer"]
+    assert "긴급 시 112" in payload["answer"]
     assert "112" in payload["answer"]
     assert "금융회사" in payload["answer"]
     assert "지급정지" in payload["answer"]
@@ -112,7 +114,7 @@ def test_four_scenario_top1_hard_negative_and_recall() -> None:
     assert risky_hits == 3  # 위험 Recall 100%: 3/3
 
     victim = graph.analyze_risk("이미 송금했습니다.")
-    assert graph.retrieve_documents("이미 송금했습니다.", victim["risk_type"])[0]["id"] == "KNPA-112-001"
+    assert graph.retrieve_documents("이미 송금했습니다.", victim["risk_type"])[0]["id"] == "KNPA-1394-001"
 
 
 def test_safety_rejects_reasoning_code_and_non_korean_artifacts() -> None:
@@ -130,19 +132,19 @@ def test_safety_rejects_reasoning_code_and_non_korean_artifacts() -> None:
         assert result["checks"][failed_check] is False
 
 
-def test_post_transfer_requires_all_three_emergency_actions() -> None:
+def test_post_transfer_requires_all_four_response_actions() -> None:
     risk = graph.analyze_risk("이미 송금했습니다.")
     documents = graph.retrieve_documents("이미 송금했습니다.", risk["risk_type"])
     incomplete_answers = [
-        "이미 송금했다면 추가 송금을 중단하고 즉시 112에 신고한 뒤 관련 자료를 보관하고 공식 안내를 확인하세요.",
-        "이미 송금했다면 추가 송금을 중단하고 지급정지를 요청한 뒤 관련 자료를 보관하고 공식 안내를 확인하세요.",
-        "이미 송금했다면 추가 송금을 중단하고 금융회사에 연락한 뒤 관련 자료를 보관하고 공식 안내를 확인하세요.",
-        "이미 송금했다면 추가 송금을 중단하고 112와 금융회사에 연락한 뒤 관련 자료를 보관하고 공식 안내를 확인하세요.",
+        "이미 송금했다면 추가 송금을 중단하고 긴급 시 112에 신고한 뒤 금융회사에 지급정지를 요청하고 공식 안내를 확인하세요.",
+        "이미 송금했다면 추가 송금을 중단하고 1394에 신고·상담한 뒤 금융회사에 지급정지를 요청하고 공식 안내를 확인하세요.",
+        "이미 송금했다면 추가 송금을 중단하고 1394에 신고·상담하고 긴급 시 112에 신고한 뒤 지급정지를 요청하세요.",
+        "이미 송금했다면 추가 송금을 중단하고 1394에 신고·상담하고 긴급 시 112에 신고한 뒤 금융회사에 연락하세요.",
     ]
     for answer in incomplete_answers:
         assert graph.evaluate_safety(answer, risk, documents)["passed"] is False
 
-    complete = "이미 송금했다면 추가 송금을 중단하고 112에 신고한 뒤 금융회사에 지급정지를 요청하고 관련 자료를 보관하세요."
+    complete = "이미 송금했다면 추가 송금을 중단하고 1394에 신고·상담한 뒤 긴급 시 112에 신고하고 해당 금융회사에 지급정지를 요청하세요."
     assert graph.evaluate_safety(complete, risk, documents)["passed"] is True
     assert graph.evaluate_safety(graph.safe_mock_answer(risk, documents), risk, documents)["passed"] is True
 

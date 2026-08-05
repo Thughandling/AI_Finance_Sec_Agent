@@ -321,7 +321,7 @@ export default function Home() {
               <div className={`message-wrap ${message.role}`} key={`${message.text}-${index}`}>
                 <div className="message">{message.text}</div>
                 {message.model && <small className="model-trace">{message.model}{message.fallback ? " · fallback" : ""}</small>}
-                {message.actions && <div className="action-row"><button onClick={() => showToast("112 연결 절차를 시뮬레이션했습니다. 실제 신고는 수행되지 않습니다.")}>☎ 112 대응 안내</button><button onClick={() => showToast("금융회사 지급정지 요청 절차를 시뮬레이션했습니다.")}>⊘ 지급정지 절차</button></div>}
+                {message.actions && <div className="action-row"><button onClick={() => showToast("1394 신고·상담 절차를 시뮬레이션했습니다. 긴급한 상황은 112에 신고해야 하며 실제 신고는 수행되지 않습니다.")}>☎ 1394 피해 신고·상담</button><button onClick={() => showToast("해당 금융회사 지급정지 요청 절차를 시뮬레이션했습니다.")}>⊘ 지급정지 절차</button></div>}
               </div>
             ))}
             {loading && <div className="thinking"><span /><span /><span /> 선택 모델이 근거를 확인하고 있습니다</div>}

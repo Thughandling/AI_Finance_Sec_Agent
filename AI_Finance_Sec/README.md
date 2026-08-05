@@ -66,7 +66,7 @@ npm run dev
 
 웹 설정에서 `Ollama Local`을 선택합니다. 기본값은 `OLLAMA_BASE_URL=http://127.0.0.1:11434`, `OLLAMA_MODEL=qwen2.5:7b`, timeout 45초이며 필요하면 FastAPI 실행 전에 환경변수로 변경할 수 있습니다. 프론트 프록시의 백엔드 주소는 `FASTAPI_BASE_URL`로 변경합니다.
 
-FastAPI의 `InMemorySaver`는 데모용 프로세스 메모리입니다. `session_id`별 멀티턴은 지원하지만 서버를 재시작하면 사라집니다. 112 신고나 지급정지는 실제 실행하지 않습니다. Ollama가 중단되거나 규칙 기반 Safety 검사에 실패하면 응답과 UI에 `Mock Safety Fallback`을 표시합니다.
+FastAPI의 `InMemorySaver`는 데모용 프로세스 메모리입니다. `session_id`별 멀티턴은 지원하지만 서버를 재시작하면 사라집니다. 1394 신고·상담, 긴급 시 112 신고, 금융회사 지급정지는 실제 실행하지 않습니다. Ollama가 중단되거나 규칙 기반 Safety 검사에 실패하면 응답과 UI에 `Mock Safety Fallback`을 표시합니다.
 
 공개 배포 서버는 사용자 PC의 localhost Ollama에 접근할 수 없습니다. Ollama 시연은 위 로컬 3개 프로세스 구성으로 실행하고, 공개 URL에서는 Mock 또는 클라우드 BYOK를 사용합니다. 클라우드 키는 저장하지 않지만 Next 서버 프록시를 경유하므로 제한된 촬영용 키를 이용한 로컬 시연을 권장합니다.
 
@@ -98,4 +98,6 @@ backend/.venv/bin/python backend/scripts/smoke_ollama.py
 
 ## 데모 주의사항
 
-모든 통화·거래 샘플은 합성 데이터입니다. 112 신고, 지급정지, 거래 차단 등 외부 금융 조치는 실제로 수행하지 않고 절차만 안내합니다.
+모든 통화·거래 샘플은 합성 데이터입니다. 피해 발생 시 1394 신고·상담, 긴급 시 112 신고, 해당 금융회사 지급정지 요청 순서를 안내하지만 신고·지급정지·거래 차단 등 외부 조치는 실제로 수행하지 않습니다.
+
+피해대응 번호는 경찰청의 2026년 전기통신금융사기 통합대응단 대표번호 `1394` 운영 안내를 기준으로 하며, 긴급한 현장 대응은 `112`로 구분합니다. 참고: [경찰청 1394 운영 개시 보도자료](https://www.police.go.kr/user/bbs/BD_selectBbs.do?q_bbsCode=1002&q_bbscttSn=20260202072152883)

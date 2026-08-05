@@ -19,11 +19,20 @@ test("detects the remote-control app sentence as fraud", async () => {
 });
 
 test("treats an already-transferred report as a high-risk victim event", async () => {
-  const { analyzeText } = await engine();
+  const { analyzeText, retrieveAndRerank } = await engine();
   const result = analyzeText("이미 송금했습니다. 무엇부터 해야 하나요?");
   assert.equal(result.verdict, "사기");
   assert.equal(result.riskType, "피해 발생");
   assert.ok(result.score >= 70);
+  assert.equal(retrieveAndRerank("이미 송금했습니다.", result.riskType)[0].id, "KNPA-1394-001");
+});
+
+test("shows the current victim-response guidance without claiming external execution", async () => {
+  const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  assert.match(page, /1394 피해 신고·상담/);
+  assert.match(page, /긴급한 상황은 112/);
+  assert.match(page, /해당 금융회사 지급정지 요청/);
+  assert.match(page, /실제 신고는 수행되지 않습니다/);
 });
 
 test("returns the expected RAG Top1 for all four demo scenarios", async () => {

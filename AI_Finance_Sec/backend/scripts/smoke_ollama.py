@@ -52,7 +52,8 @@ def sanitise(payload: dict) -> dict:
             "no_dangerous_action_recommendation": checks.get("no_dangerous_action_recommendation"),
         },
         "required_actions": {
-            "police_112": checks.get("post_transfer_police_112"),
+            "report_1394": checks.get("post_transfer_1394"),
+            "emergency_112": checks.get("post_transfer_emergency_112"),
             "financial_company": checks.get("post_transfer_financial_company"),
             "payment_stop": checks.get("post_transfer_payment_stop"),
         },
@@ -135,7 +136,7 @@ def main() -> None:
             f"uvicorn backend.main:app --host 127.0.0.1 --port {api_port}",
             smoke_command,
         ],
-        "assertions": "risky 2-turn, victim, and normal all use guarded_policy with Qwen invoked, policy guardrail, fallback=false; victim has 112+financial company+payment stop",
+        "assertions": "all cases use guarded_policy with Qwen invoked, policy guardrail, fallback=false; victim has 1394+emergency 112+financial company+payment stop",
         "turns": turns,
         "victim_case": {
             "request": {"message": "이미 송금했습니다. 무엇부터 해야 하나요?"},

@@ -147,11 +147,11 @@ export const knowledgeBase: KnowledgeDocument[] = [
     status: "current",
   },
   {
-    id: "KNPA-112-001",
+    id: "KNPA-1394-001",
     title: "보이스피싱 피해 직후 조치",
     authority: "경찰청",
     riskTypes: ["금전 요구", "피해 발생"],
-    content: "이미 송금했다면 즉시 112와 해당 금융회사에 연락해 지급정지를 요청하고 이체내역, 계좌번호, 통화와 문자 기록을 보관합니다.",
+    content: "이미 송금했다면 1394에 신고·상담하고, 긴급한 상황은 112에 신고하며, 해당 금융회사에 연락해 지급정지를 요청하고 이체내역·계좌번호·통화·문자 기록을 보관합니다.",
     sourceUrl: "https://www.police.go.kr/",
     status: "current",
   },
@@ -239,7 +239,7 @@ export function analyzeText(text: string, transactionRisk = 0): DetectionResult 
   const riskType = score < 40 ? "정상 절차" : [...typeScores.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "정상 절차";
   const actions = verdict === "정상"
     ? ["공식 대표번호·앱에서 상담 내용 재확인", "불필요한 개인정보는 제공하지 않기"]
-    : ["통화 즉시 종료", "추가 송금·앱 설치 중단", "증거 보관", "112와 금융회사에 직접 연락"];
+    : ["통화 즉시 종료", "추가 송금·앱 설치 중단", "증거 보관", "1394 신고·상담", "긴급 시 112 신고", "해당 금융회사에 지급정지 요청"];
 
   return { score, level, verdict, riskType, evidence, actions };
 }
@@ -281,7 +281,7 @@ export function retrieveAndRerank(query: string, riskType: string): RetrievalRes
 export function buildMockAnswer(result: DetectionResult, _documents: RetrievalResult[], userText: string): string {
   const transferred = /이미.*(송금|이체)|보냈|입금했/.test(userText);
   if (transferred) {
-    return "이미 송금하셨다면 지금은 속도가 중요합니다. 추가 송금을 멈추고 112와 해당 금융회사에 직접 연락해 지급정지를 요청하세요. 이체내역·계좌번호·통화와 문자 기록도 보관해 주세요.";
+    return "이미 송금하셨다면 지금은 속도가 중요합니다. 추가 송금을 멈추고 1394에 신고·상담하세요. 긴급한 상황은 112에 신고하고, 해당 금융회사에 직접 연락해 지급정지를 요청하세요. 이체내역·계좌번호·통화와 문자 기록도 보관해 주세요.";
   }
   if (result.verdict === "정상") {
     return "현재 문장에서는 강한 사기 징후가 확인되지 않았습니다. 다만 상대가 송금이나 앱 설치를 새로 요구하면 중단하고, 공식 대표번호로 상담 내용을 다시 확인하세요.";
