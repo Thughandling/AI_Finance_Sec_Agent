@@ -1,0 +1,35 @@
+{
+  "version": "2026-08-13",
+  "purpose": "비판 에이전트가 기존 회귀셋과 분리해 실행한 4차 블라인드 검증셋",
+  "single_turn": [
+    {"id":"blind-f-org-new","text":"경찰청 사이버수사대라며 공탁금을 내야 사건을 종결할 수 있다고 합니다.","expected_label":"fraud","expected_risk_type":"기관 사칭","expected_top1":"FSS-ORG-001"},
+    {"id":"blind-f-loan-new","text":"내가 문의한 대출이긴 한데 소개자가 심사 통과용 예치금을 자기 계좌로 쏘래요.","expected_label":"fraud","expected_risk_type":"대출 미끼","expected_top1":"FSS-LOAN-001"},
+    {"id":"blind-f-app-new","text":"상대가 휴대폰 점검을 해준다며 러스트데스크를 받아 원격 접속을 허용하라고 해요.","expected_label":"fraud","expected_risk_type":"앱 설치","expected_top1":"FSEC-APP-001"},
+    {"id":"blind-f-bec-new","text":"CFO입니다. 송금처가 바뀌었으니 새 거래처 통장으로 오늘 송장 결제를 끝내세요.","expected_label":"fraud","expected_risk_type":"기업 사칭 BEC","expected_top1":"FSEC-BEC-001"},
+    {"id":"blind-f-smish-new","text":"과태료 고지서라며 문자에 붙은 QR을 찍고 결제 정보를 적으라고 합니다.","expected_label":"fraud","expected_risk_type":"택배·환급","expected_top1":"FSEC-SMISH-001"},
+    {"id":"blind-f-family-new","text":"아빠, 나 유치장인데 합의금이 급해. 변호사 사무실로 돈 좀 부쳐줘.","expected_label":"fraud","expected_risk_type":"가족 빙자","expected_top1":"KNPA-FAMILY-001"},
+    {"id":"blind-v-card-new","text":"낯선 사람이 시키는 대로 선불카드 뒷자리 숫자를 읽어줬습니다.","expected_label":"fraud","expected_risk_type":"피해 발생","expected_top1":"KNPA-1394-001"},
+    {"id":"blind-v-id-new","text":"모르는 링크를 열어 주민등록번호와 계좌 정보를 적어 제출했어요.","expected_label":"fraud","expected_risk_type":"피해 발생","expected_top1":"KNPA-1394-001"},
+    {"id":"blind-v-remote-new","text":"그쪽 요청대로 휴대폰 원격지원 권한을 허용했고 화면이 조작됐어요.","expected_label":"fraud","expected_risk_type":"피해 발생","expected_top1":"KNPA-1394-001"},
+    {"id":"blind-v-cash-new","text":"낯선 안내를 믿고 퀵서비스로 오백만원을 보냈습니다.","expected_label":"fraud","expected_risk_type":"피해 발생","expected_top1":"KNPA-1394-001"},
+    {"id":"blind-n-market","text":"모르는 판매자에게 중고거래 물건값으로 돈을 보냈고 물건을 받았습니다.","expected_label":"normal","expected_risk_type":"정상 절차","expected_top1":"SAFE-NORMAL-001"},
+    {"id":"blind-n-otp-screen","text":"제가 전화한 은행 상담원 설명을 들으며 공식 앱 화면에 비밀번호를 직접 입력했습니다.","expected_label":"normal","expected_risk_type":"정상 절차","expected_top1":"SAFE-NORMAL-001"},
+    {"id":"blind-n-crypto","text":"국내 거래소에서 제 하드웨어 지갑으로 테더를 전송해 보관했습니다.","expected_label":"normal","expected_risk_type":"정상 절차","expected_top1":"SAFE-NORMAL-001"},
+    {"id":"blind-n-bec","text":"대표가 대면 결재한 변경 거래처 계좌로 월 정기대금을 집행했습니다.","expected_label":"normal","expected_risk_type":"정상 절차","expected_top1":"SAFE-NORMAL-001"},
+    {"id":"blind-n-loan","text":"은행 공식 홈페이지에서 주택대출 보증료와 한도를 계산하고 있습니다.","expected_label":"normal","expected_risk_type":"정상 절차","expected_top1":"SAFE-NORMAL-001"},
+    {"id":"blind-n-card","text":"회사 동료에게 공용 구매카드를 잠시 건네 영수증과 함께 돌려받았습니다.","expected_label":"normal","expected_risk_type":"정상 절차","expected_top1":"SAFE-NORMAL-001"}
+  ],
+  "multi_turn": [
+    {"id":"blind-m-cancel","turns":["검사가 계좌로 돈을 보내라고 해요","아까 건 교육용 문장을 따라 읽은 것뿐이에요"],"expected_label":"normal","expected_risk_type":"정상 절차","expected_top1":"SAFE-NORMAL-001"},
+    {"id":"blind-m-end","turns":["수사관이 안전계좌로 이체하래요","그 이야기는 끝났고 여행 질문으로 바꿀게요"],"expected_label":"normal","expected_risk_type":"정상 절차","expected_top1":"SAFE-NORMAL-001"},
+    {"id":"blind-m-real-not","turns":["원격제어 앱을 설치하래요","실화가 아니라 기사 내용을 요약한 것이었습니다"],"expected_label":"normal","expected_risk_type":"정상 절차","expected_top1":"SAFE-NORMAL-001"},
+    {"id":"blind-m-gradual4","turns":["경찰청 조사관이라고 전화했어요","명의 확인 절차라네요","잠시 맡아두는 곳이 있대요","보유 자산을 전부 그리 옮기랍니다"],"expected_label":"fraud","expected_risk_type":"기관 사칭","expected_top1":"FSS-ORG-001"}
+  ],
+  "rag": [
+    {"id":"blind-rag-org","query":"공탁금을 내야 사건을 닫아준대요","risk_type":"기관 사칭","expected_top1":"FSS-ORG-001","expected_mode":"hybrid"},
+    {"id":"blind-rag-prepaid-victim","query":"선불카드 뒷자리 숫자를 읽어줬어요","risk_type":"피해 발생","expected_top1":"KNPA-1394-001","expected_mode":"hybrid"},
+    {"id":"blind-rag-id-victim","query":"주민등록번호를 입력해 제출했어요","risk_type":"피해 발생","expected_top1":"KNPA-1394-001","expected_mode":"hybrid"},
+    {"id":"blind-rag-normal-loan","query":"주택대출 보증료 계산","risk_type":"정상 절차","expected_top1":"SAFE-NORMAL-001","expected_mode":"hybrid"},
+    {"id":"blind-rag-remote","query":"휴대폰 원격지원 권한을 허용했어요","risk_type":"앱 설치","expected_top1":"FSEC-APP-001","expected_mode":"hybrid"}
+  ]
+}

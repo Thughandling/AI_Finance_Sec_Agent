@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import asyncio
+import json
+from collections import defaultdict
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
@@ -10,6 +14,171 @@ from backend.main import app
 
 
 client = TestClient(app)
+EVALUATION_PATH = Path(__file__).parents[2] / "public" / "data" / "evaluation_cases.json"
+HOLDOUT_PATH = Path(__file__).parents[2] / "public" / "data" / "evaluation_holdout.json"
+
+
+def _structured(**overrides):
+    value = {
+        "state": "normal", "risk_type": "정상 절차", "completed_action": False, "external_actor": False,
+        "requested_asset": {"financial_value": False, "credential": False, "remote_control": False, "identity": False},
+        "action_polarity": "self_action", "destination": "self", "confidence": 0.93, "evidence_spans": [],
+    }
+    value.update(overrides)
+    return value
+
+
+def test_structured_json_parsing_conservative_fusion_and_failure(monkeypatch) -> None:
+    fraud = _structured(state="fraud", risk_type="기업 사칭 BEC", external_actor=True, action_polarity="requested", destination="external", confidence=0.91)
+    parsed = graph.parse_structured_risk(json.dumps(fraud, ensure_ascii=False))
+    fused = graph.fuse_risk(graph.analyze_risk("모르는 요청입니다"), parsed)
+    assert fused["verdict"] == "사기" and fused["level"] == "위험" and fused["risk_type"] == "기업 사칭 BEC"
+
+    victim = _structured(state="victim", risk_type="개인정보 요구", completed_action=True, external_actor=True, action_polarity="completed", destination="external", confidence=0.88)
+    assert graph.fuse_risk(graph.analyze_risk("자료를 줬어요"), victim)["risk_type"] == "피해 발생"
+
+    disagreement = _structured(state="normal", confidence=0.9)
+    cautious = graph.fuse_risk(graph.analyze_risk("검찰이 안전계좌로 송금하래요"), disagreement)
+    assert cautious["verdict"] == "사기" and cautious["level"] in {"주의", "위험"}
+
+    async def invalid(_context):
+        return "not-json"
+    monkeypatch.setattr(graph, "call_ollama_structured", invalid)
+    result = asyncio.run(graph.structured_risk_agent({"analysis_input": "검찰이 안전계좌로 송금하래요"}))
+    assert result["structured_fallback"] is True
+    assert result["risk"]["fusion"] == "rule_fallback"
+
+
+def test_incident_summary_reset_and_progressive_preservation() -> None:
+    first = graph.prepare_input({"user_input": "검찰 수사관이라고 전화했어요"})
+    second = graph.prepare_input({"user_input": "범죄 연루라네요", "incident_summary": first["incident_summary"]})
+    third = graph.prepare_input({"user_input": "그 계좌로 보내도 되나요", "incident_summary": second["incident_summary"]})
+    assert "검찰 수사관" in third["analysis_input"] and "계좌로 보내" in third["analysis_input"]
+    corrected = graph.prepare_input({"user_input": "정정합니다. 앞 문장은 예문이고 실제로 송금하지 않았습니다", "incident_summary": third["incident_summary"]})
+    assert corrected["incident_status"] == "closed"
+    assert "검찰 수사관" not in corrected["analysis_input"]
+ROUND2_PATH = Path(__file__).parents[2] / "public" / "data" / "evaluation_adversarial_round2.json"
+ROUND3_PATH = Path(__file__).parents[2] / "public" / "data" / "evaluation_adversarial_round3.json"
+
+
+def test_shared_regression_set_confusion_category_rag_and_victim_policy_gates() -> None:
+    dataset = json.loads(EVALUATION_PATH.read_text(encoding="utf-8"))
+    cases = dataset["cases"]
+    gates = dataset["quality_gates"]
+    assert len(cases) >= 38
+    assert len({case["id"] for case in cases}) == len(cases)
+
+    tp = tn = fp = fn = 0
+    category_results: dict[str, list[bool]] = defaultdict(list)
+    rag_hits = 0
+    for case in cases:
+        risk = graph.analyze_risk(case["text"])
+        predicted = "fraud" if risk["verdict"] == "사기" else "normal"
+        correct = predicted == case["label"]
+        category_results[case["category"]].append(correct)
+        tp += int(case["label"] == "fraud" and predicted == "fraud")
+        tn += int(case["label"] == "normal" and predicted == "normal")
+        fp += int(case["label"] == "normal" and predicted == "fraud")
+        fn += int(case["label"] == "fraud" and predicted == "normal")
+
+        assert predicted == case["label"], f"{case['id']}: {case['failure_mode']}"
+        assert risk["risk_type"] == case["expected_risk_type"], case["id"]
+        top1 = graph.retrieve_documents(case["text"], risk["risk_type"])[0]["id"]
+        rag_hits += int(top1 == case["expected_top1"])
+        assert top1 == case["expected_top1"], case["id"]
+
+        if case["category"] == "피해완료":
+            actions = graph.recommend_policy(risk)["actions"]
+            assert "1394 신고·상담" in actions
+            assert "긴급 시 112 신고" in actions
+            assert "해당 금융회사 콜센터에 지급정지 요청" in actions
+
+    fraud_precision = tp / max(tp + fp, 1)
+    fraud_recall = tp / max(tp + fn, 1)
+    fraud_f1 = 2 * fraud_precision * fraud_recall / max(fraud_precision + fraud_recall, 1e-12)
+    normal_precision = tn / max(tn + fn, 1)
+    normal_recall = tn / max(tn + fp, 1)
+    normal_f1 = 2 * normal_precision * normal_recall / max(normal_precision + normal_recall, 1e-12)
+    macro_f1 = (fraud_f1 + normal_f1) / 2
+    false_positive_rate = fp / max(fp + tn, 1)
+
+    assert macro_f1 >= gates["min_macro_f1"]
+    assert fraud_recall >= gates["min_fraud_recall"]
+    assert false_positive_rate <= gates["max_false_positive_rate"]
+    assert rag_hits / len(cases) >= gates["rag_top1_accuracy"]
+    for category, results in category_results.items():
+        assert sum(results) / len(results) >= gates["min_category_recall"], category
+
+
+def test_separate_holdout_and_critical_cases() -> None:
+    dataset = json.loads(HOLDOUT_PATH.read_text(encoding="utf-8"))
+    cases = dataset["cases"]
+    gates = dataset["quality_gates"]
+    critical = [case for case in cases if case["critical"]]
+    assert len(cases) >= 40
+    assert len(critical) == 8
+    assert len({case["family_id"] for case in cases}) == len(cases)
+
+    tp = tn = fp = fn = rag_hits = rag_total = critical_hits = 0
+    for case in cases:
+        risk = graph.analyze_risk(case["text"])
+        predicted = "fraud" if risk["verdict"] == "사기" else "normal"
+        tp += int(case["label"] == "fraud" and predicted == "fraud")
+        tn += int(case["label"] == "normal" and predicted == "normal")
+        fp += int(case["label"] == "normal" and predicted == "fraud")
+        fn += int(case["label"] == "fraud" and predicted == "normal")
+        critical_hits += int(case["critical"] and predicted == case["label"])
+        assert predicted == case["label"], case["id"]
+        assert risk["risk_type"] == case["expected_risk_type"], case["id"]
+        documents = graph.retrieve_documents(case["text"], risk["risk_type"])
+        if case["expected_top1"] is None:
+            assert documents == []
+        else:
+            rag_total += 1
+            rag_hits += int(documents[0]["id"] == case["expected_top1"])
+            assert documents[0]["id"] == case["expected_top1"], case["id"]
+        if case["category"] == "피해완료":
+            actions = graph.recommend_policy(risk)["actions"]
+            assert {"1394 신고·상담", "긴급 시 112 신고", "해당 금융회사 콜센터에 지급정지 요청"}.issubset(actions)
+
+    fraud_precision = tp / max(tp + fp, 1)
+    fraud_recall = tp / max(tp + fn, 1)
+    fraud_f1 = 2 * fraud_precision * fraud_recall / max(fraud_precision + fraud_recall, 1e-12)
+    normal_precision = tn / max(tn + fn, 1)
+    normal_recall = tn / max(tn + fp, 1)
+    normal_f1 = 2 * normal_precision * normal_recall / max(normal_precision + normal_recall, 1e-12)
+    assert (fraud_f1 + normal_f1) / 2 >= gates["min_macro_f1"]
+    assert fraud_recall >= gates["min_fraud_recall"]
+    assert fp / max(fp + tn, 1) <= gates["max_false_positive_rate"]
+    assert critical_hits / len(critical) >= gates["min_critical_recall"]
+    assert rag_hits / rag_total >= gates["min_rag_top1_accuracy"]
+
+
+def test_adversarial_rounds_cover_single_turn_rag_and_multiturn(monkeypatch) -> None:
+    round2 = json.loads(ROUND2_PATH.read_text(encoding="utf-8"))
+    round3 = json.loads(ROUND3_PATH.read_text(encoding="utf-8"))
+    for case in [*round2["cases"], *round3["single_turn"]]:
+        risk = graph.analyze_risk(case["text"])
+        assert ("fraud" if risk["verdict"] == "사기" else "normal") == case["label"], case["id"]
+        assert risk["risk_type"] == case["expected_risk_type"], case["id"]
+    for case in round3["rag"]:
+        documents = graph.retrieve_documents(case["query"], case["risk_type"])
+        assert (documents[0]["id"] if documents else None) == case["expected"], case["id"]
+        assert (documents[0]["retrieval_mode"] if documents else None) == case["mode"], case["id"]
+
+    async def fake_ollama(_messages):
+        return "금융회사 공식 대표번호로 사실을 확인하고 필요한 자료를 보관하세요."
+
+    monkeypatch.setattr(graph, "call_ollama", fake_ollama)
+    for case in round3["multi_turn"]:
+        session_id = f"adversarial-{case['id']}-{uuid4()}"
+        payload = None
+        for turn in case["turns"]:
+            response = client.post("/api/chat", json={"message": turn, "session_id": session_id})
+            assert response.status_code == 200
+            payload = response.json()
+        assert payload is not None
+        assert payload["risk"]["verdict"] == case["expected"], case["id"]
 
 
 def test_health_describes_local_demo_memory() -> None:
@@ -38,7 +207,7 @@ def test_langgraph_ollama_success_and_multiturn(monkeypatch) -> None:
     assert payload["policy_guardrail_applied"] is True
     assert payload["safety"]["passed"] is True
     assert payload["external_action_executed"] is False
-    assert {"risk_agent", "knowledge_agent", "policy_agent"}.issubset(payload["trace"])
+    assert {"structured_risk_agent_failed", "rule_risk_fallback", "knowledge_agent", "policy_agent"}.issubset(payload["trace"])
     assert "policy_guardrail" in payload["trace"]
     assert payload["trace"][-2:] == ["safety_verifier", "finalize"]
     second_payload = second.json()

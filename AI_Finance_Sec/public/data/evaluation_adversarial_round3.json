@@ -1,0 +1,32 @@
+{
+  "version":"2026-08-13",
+  "purpose":"3차 critic의 span·피해자산·멀티턴·RAG 실패를 고정한 합성셋",
+  "single_turn":[
+    {"id":"r3-mixed-inline","text":"교육자료에서 송금하지 말라고 읽었지만 지금 수사관이 임시보관계좌로 넘기라고 해요.","label":"fraud","expected_risk_type":"기관 사칭"},
+    {"id":"r3-negated","text":"세미나에서 일회용 암호를 읽어 달라는 요구는 거절하라고 배웠습니다.","label":"normal","expected_risk_type":"정상 절차"},
+    {"id":"r3-id-copy","text":"검찰 직원에게 신분증과 통장 사본을 보냈는데 사기 같습니다.","label":"fraud","expected_risk_type":"피해 발생"},
+    {"id":"r3-cert","text":"금감원 상담원에게 공동인증서와 비밀번호를 알려줬습니다.","label":"fraud","expected_risk_type":"피해 발생"},
+    {"id":"r3-gold","text":"수사관 요구대로 금괴를 직원에게 전달했습니다.","label":"fraud","expected_risk_type":"피해 발생"},
+    {"id":"r3-culture","text":"새 번호 친구에게 문화상품권 번호를 알려줬고 연락이 끊겼어요.","label":"fraud","expected_risk_type":"피해 발생"},
+    {"id":"r3-corp-card","text":"업무용 법인카드를 담당 직원에게 전달했습니다.","label":"normal","expected_risk_type":"정상 절차"},
+    {"id":"r3-wallet","text":"본인 명의 거래소에서 본인 개인지갑으로 가상자산을 전송했습니다.","label":"normal","expected_risk_type":"정상 절차"},
+    {"id":"r3-bec-coupon","text":"사장입니다. 대금 집행 대신 상품권 코드를 바로 회신하세요.","label":"fraud","expected_risk_type":"기업 사칭 BEC"},
+    {"id":"r3-anonymous-risk","text":"임시보관계좌로 넘겨야 한다고 재촉합니다.","label":"fraud","expected_risk_type":"기관 사칭"},
+    {"id":"r3-normal-news","text":"뉴스 자료에서 금괴 전달 사기 사례를 읽었습니다.","label":"normal","expected_risk_type":"정상 절차"},
+    {"id":"r3-otp-read","text":"금융감독원 직원이 일회용암호를 읽어 달라고 합니다.","label":"fraud","expected_risk_type":"개인정보 요구"}
+  ],
+  "multi_turn":[
+    {"id":"r3-multi-correction","turns":["검찰이 안전계좌로 보내래요","정정할게요. 그건 예문이고 실제로는 송금하지 않았습니다"],"expected":"정상"},
+    {"id":"r3-multi-example","turns":["원격제어 앱을 설치하래요","앞 문장은 교육 예시이고 실제 요청은 없습니다"],"expected":"정상"},
+    {"id":"r3-multi-newtopic","turns":["수사관이 계좌로 보내래요","새 주제입니다. 제가 요청한 정상 은행 상담이에요"],"expected":"정상"},
+    {"id":"r3-multi-progressive","turns":["검찰 수사관이라고 전화했어요","범죄 연루라네요","그 계좌로 보내도 되나요"],"expected":"사기"}
+  ],
+  "rag":[
+    {"id":"r3-rag-bec","query":"협력사 변경계좌 대금집행","risk_type":"기업 사칭 BEC","expected":"FSEC-BEC-001","mode":"hybrid"},
+    {"id":"r3-rag-victim","query":"금괴를 넘겼어요","risk_type":"피해 발생","expected":"KNPA-1394-001","mode":"hybrid"},
+    {"id":"r3-rag-app","query":"애니데스크 연결숫자","risk_type":"앱 설치","expected":"FSEC-APP-001","mode":"hybrid"},
+    {"id":"r3-rag-loan","query":"신용복구 예탁금","risk_type":"대출 미끼","expected":"FSS-LOAN-001","mode":"hybrid"},
+    {"id":"r3-rag-risk-fallback","query":"그걸 하라고 재촉해요","risk_type":"기관 사칭","expected":"FSS-ORG-001","mode":"policy_fallback"},
+    {"id":"r3-rag-normal-empty","query":"오늘 날씨가 좋아요","risk_type":"정상 절차","expected":null,"mode":null}
+  ]
+}

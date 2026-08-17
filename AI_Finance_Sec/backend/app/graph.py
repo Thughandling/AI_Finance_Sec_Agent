@@ -3,6 +3,7 @@ from __future__ import annotations
 import operator
 import os
 import re
+import json
 from typing import Annotated, Any, TypedDict
 
 import httpx
@@ -16,16 +17,53 @@ OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip(
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:7b")
 OLLAMA_TIMEOUT_SECONDS = float(os.getenv("OLLAMA_TIMEOUT_SECONDS", "45"))
 
-RISK_RULES = (
-    ({"안전계좌", "검찰", "수사관", "금감원"}, 28, "기관 사칭"),
-    ({"지금 즉시", "오늘 안에", "전화 끊으면", "비밀"}, 20, "긴급성"),
-    ({"이체", "송금", "수수료", "현금", "지정 계좌"}, 30, "금전 요구"),
-    ({"대출", "대환대출", "선입금"}, 34, "대출 미끼"),
-    ({"앱 설치", "앱을 설치", "원격제어", "apk", "링크", "설치하세요"}, 42, "앱 설치"),
-    ({"자녀", "따님", "아들", "사고", "납치"}, 30, "가족 빙자"),
+RISK_PATTERNS = (
+    (r"(검찰|검사|수사관|금감원|금융감독원|금융감독언|법원|구속영장).{0,35}(범죄|연루|혐의|영장|계좌|자금|돈|소명)", 42, "기관 사칭", "수사·감독기관 사칭 맥락"),
+    (r"(안전|보호|보안|검수|별도|임시보관)계좌.{0,24}(이체|송금|옮겨|보내|입금|넘기|넘겨|집행)|(?:이체|송금|옮겨|보내|입금|넘기|넘겨|집행).{0,24}(안전|보호|보안|검수|별도|임시보관)계좌", 42, "기관 사칭", "보호 명목 계좌 이동 요구"),
+    (r"(대출|대환|신용점수|신용복구|한도|3퍼센트상품).{0,45}(수수료|선입금|먼저상환|작업비|보증료|예탁금|처리)|(?:수수료|선입금|작업비|보증료|예탁금).{0,35}(대출|한도|상품|승인|실행|신용복구)", 50, "대출 미끼", "대출 실행 전 비용 요구"),
+    (r"(원격제어|보안프로그램|보안앱|apk|팀뷰어|애니데스크|연결숫자).{0,32}(설치|깔아|받아|실행|인증|읽어|회신|알려)|(?:설치|깔아|받아|실행).{0,24}(원격제어|보안프로그램|보안앱|apk|팀뷰어|애니데스크)", 52, "앱 설치", "원격제어·비공식 앱 실행 요구"),
+    (r"(택배|배송|소포|환급|과오납|국세).{0,55}(링크|주소|페이지|bit점ly|카드번호|계좌비밀번호|인증|결제)", 48, "택배·환급", "택배·환급 미끼 정보입력 요구"),
+    (r"(리딩방|코인|가상자산|거래소|손실복구|증거금).{0,55}(원금|수익|보장|입금|송금|세금|먼저|보태|회수|출금)", 50, "투자 사기", "투자수익·출금 명목 선입금"),
+    (r"(재무이사|대표|사장|임원).{0,65}(변경된?협력사계좌|협력사계좌변경|대금집행|쿠폰|상품권|코드).{0,25}(송금|이체|집행|회신|보내|알려)|(?:변경된?협력사계좌|대금집행).{0,45}(대표|사장|임원|재무이사)", 55, "기업 사칭 BEC", "임원 사칭 결제·코드 요구"),
+    (r"(부장님|사장님|친구|지인|새번호|친구폰|회의중|통화못|전화는안돼).{0,55}(상품권|핀번호|돈|병원비|빌려|보내|결제|회신)", 48, "지인·메신저", "지인 사칭 비대면 금전 요구"),
+    (r"(따님|자녀|아들|딸|엄마나|아빠나).{0,55}(사고|수술|잡혀|납치|휴대폰.*고장|친구폰|돈|현금|계좌|보내)|(?:사고|수술|잡혀|납치).{0,45}(현금|돈|전달|넘기)", 52, "가족 빙자", "가족 위급상황·금전 요구"),
+    (r"(계좌비밀번호|카드번호|인증번호|인증코드|otp|일회용암호|공동인증서|선불카드뒷면숫자).{0,25}(입력|알려|보내|인증|읽어|회신|넘기)", 45, "개인정보 요구", "금융 인증정보 요구"),
+    (r"(지금|오늘|즉시|바로|전화끊지|비밀|말하지).{0,35}(보내|송금|이체|입금|전달|준비|옮겨)", 18, "긴급성", "긴급·고립 압박"),
+    (r"(돈|자금|현금|금액|수수료|보증료|작업비).{0,24}(보내|송금|이체|입금|전달|넘기|준비)|(?:송금|이체|입금).{0,15}(하세요|해라|해주세요|해야|부탁)", 24, "금전 요구", "금전 이동 요구"),
 )
 
-NEGATIONS = ("필요는 없습니다", "요구하지 않습니다", "하지 마세요", "불필요", "대표번호로 다시")
+NORMAL_CLAUSE_PATTERNS = (
+    r"(?:뉴스|기사|보도).{0,30}(사건|사례|보도)",
+    r"(?:교육|예방|예방법).{0,45}(배웠|의심|하지말|누르지말|설치하지말|입금하지말)",
+    r"(?:신고|제보).{0,35}(가져왔|하려고).{0,30}(보내지않|입금하지않|이체하지않)",
+    r"(?:제가|직접).{0,25}(신청|요청).{0,35}(공식앱|대표번호).{0,35}(필요없|요구하지않|확인)",
+    r"(?:고객|제가).{0,40}(요청|신청).{0,80}(송금|설치).{0,18}(필요없|필요는없)",
+    r"(?:은행|직원|상담원).{0,35}(요구하지않|보내지않|링크를보내지않).{0,35}(대표번호|공식앱|다시확인|확인)",
+    r"(?:등록된|평소쓰던).{0,25}(아들|딸|부모님|가족|계좌).{0,35}(생활비|학원비|병원비|송금|이체|입금)",
+    r"(?:앱스토어|공식스토어).{0,25}(은행)?공식앱.{0,25}(설치|검색)",
+    r"택배사공식앱.{0,35}(배송주소|주소).{0,35}(수정|변경)",
+    r"제가.{0,20}(신청|요청).{0,20}(대출|상담)",
+    r"(?:신고|제보).{0,30}(하려고|가져왔)",
+    r"공식앱.{0,35}(필요없|필요는없|요구하지않|확인)",
+    r"(?:세미나|교육|뉴스|기사|자료).{0,55}(읽었|배웠|나왔|사례)",
+    r"본인이연공식앱.{0,35}(otp|일회용암호).{0,20}(직접입력)",
+    r"본인명의거래소.{0,35}(인증된본인계좌|본인개인지갑).{0,20}(출금|전송)",
+    r"업무용법인카드.{0,20}(직원|동료).{0,15}(전달|건넸)",
+)
+
+COMPLETED_ACTION_PATTERNS = (
+    r"이미.{0,15}(송금|이체)|(?:돈|자금).{0,12}(보냈|입금했|송금했|이체했|전송했)|알려준곳에입금했|요구한대로.{0,15}(보냈|입금했|송금했|이체했)",
+    r"(?:상품권|기프트카드).{0,20}(핀번호|pin|번호).{0,20}(보냈|알려|전달)",
+    r"(?:현금|카드).{0,20}(전달했|건넸|줬|넘겼)",
+    r"(?:otp|인증번호|인증코드|비밀번호).{0,20}(알려|보냈|제공|입력)",
+    r"(?:원격제어|팀뷰어|보안앱|apk).{0,20}(설치했|깔았|실행했)",
+    r"(?:코인|가상자산|비트코인|테더).{0,25}(보냈|전송했|출금했)",
+    r"(?:신분증).{0,15}(통장사본).{0,20}(보냈|제공|넘겼)|(?:통장사본).{0,15}(신분증).{0,20}(보냈|제공|넘겼)",
+    r"(?:공동인증서).{0,20}(비밀번호).{0,20}(알려|보냈|제공|넘겼)",
+    r"(?:금괴|골드바|문화상품권).{0,25}(전달했|건넸|보냈|번호를알려)",
+)
+SUSPICIOUS_TRANSFER_CONTEXT = r"(이미송금|이미이체|검찰|검사|수사관|금감원|법원|모르는사람|요구한대로|그쪽|알려준곳|사기|연락이끊|새번호|직원에게|상담원|리딩방|출금잠금|대표가|임원이|재무이사)"
+SAFE_COMPLETED_CONTEXT = r"업무용법인카드.{0,20}(직원|동료).{0,15}(전달|건넸)|본인명의거래소.{0,35}(인증된본인계좌|본인개인지갑).{0,20}(출금|전송)|본인이연공식앱.{0,35}(otp|일회용암호).{0,20}(직접입력)"
 
 KNOWLEDGE_BASE = (
     {
@@ -33,7 +71,7 @@ KNOWLEDGE_BASE = (
         "title": "기관사칭형 보이스피싱 대응",
         "authority": "금융감독원",
         "risk_types": ["기관 사칭", "금전 요구"],
-        "content": "수사기관과 금융기관은 전화로 안전계좌 이체를 요구하지 않습니다. 통화를 종료하고 상대가 알려준 번호가 아닌 공식 대표번호로 사실을 확인합니다.",
+        "content": "수사기관과 금융기관은 안전계좌·임시보관계좌 이체나 자금 집행을 요구하지 않습니다. 통화를 종료하고 상대가 알려준 번호가 아닌 공식 대표번호로 사실을 확인합니다.",
         "source_url": "https://fine.fss.or.kr/",
     },
     {
@@ -41,7 +79,7 @@ KNOWLEDGE_BASE = (
         "title": "보이스피싱 피해 직후 조치",
         "authority": "경찰청",
         "risk_types": ["피해 발생", "금전 요구"],
-        "content": "이미 송금했다면 1394에 신고·상담하고, 긴급한 상황은 112에 신고하며, 해당 금융회사에 연락해 지급정지를 요청하고 이체내역·계좌번호·통화·문자 기록을 보관합니다.",
+        "content": "이미 송금하거나 상품권 코드·OTP·신분증·통장사본·공동인증서·금괴·가상자산을 전달했다면 1394에 신고·상담하고, 긴급한 상황은 112에 신고하며 금융회사에 지급정지를 요청합니다.",
         "source_url": "https://www.police.go.kr/",
     },
     {
@@ -49,7 +87,7 @@ KNOWLEDGE_BASE = (
         "title": "대출빙자형 사기 예방",
         "authority": "금융감독원",
         "risk_types": ["대출 미끼", "선입금 요구", "금전 요구"],
-        "content": "정상 금융회사는 대출 실행 전에 개인 계좌로 수수료나 상환금을 먼저 보내라고 요구하지 않습니다. 공식 앱과 대표번호로 상품 존재 여부를 확인합니다.",
+        "content": "정상 금융회사는 대출·신용복구 실행 전에 예탁금·보증료·작업비를 개인 계좌로 먼저 보내라고 요구하지 않습니다. 공식 앱과 대표번호로 확인합니다.",
         "source_url": "https://fine.fss.or.kr/",
     },
     {
@@ -57,7 +95,7 @@ KNOWLEDGE_BASE = (
         "title": "가족빙자형 사기 확인 절차",
         "authority": "경찰청",
         "risk_types": ["가족 빙자", "통제·협박"],
-        "content": "상대와 통화를 종료한 뒤 가족 본인과 다른 가족에게 별도로 연락해 안전을 확인하고, 상대가 지정한 사람에게 현금을 전달하지 않습니다.",
+        "content": "엄마·아들·딸을 사칭해 휴대폰 고장이나 친구 폰·새 번호라며 병원비와 돈을 요구하면 가족의 기존 번호로 확인하고 현금을 전달하지 않습니다.",
         "source_url": "https://www.police.go.kr/",
     },
     {
@@ -65,7 +103,47 @@ KNOWLEDGE_BASE = (
         "title": "악성 앱과 원격제어 대응",
         "authority": "금융보안원",
         "risk_types": ["앱 설치", "원격제어"],
-        "content": "출처가 불분명한 앱과 원격제어 앱을 설치하지 않습니다. 이미 설치했다면 네트워크를 차단하고 다른 안전한 기기로 금융회사에 연락합니다.",
+        "content": "출처가 불분명한 APK와 보안 프로그램을 실행하거나 팀뷰어·애니데스크 원격제어 앱과 연결 숫자를 제공하지 않습니다. 설치했다면 네트워크를 차단합니다.",
+        "source_url": "https://www.fsec.or.kr/",
+    },
+    {
+        "id": "FSEC-SMISH-001",
+        "title": "택배·환급 사칭 스미싱 대응",
+        "authority": "금융보안원",
+        "risk_types": ["택배·환급", "개인정보 요구"],
+        "content": "택배 주소 수정이나 환급금을 빌미로 문자 링크 접속과 금융정보 입력을 요구하면 링크를 열지 말고 해당 기관의 공식 앱과 대표번호에서 직접 확인합니다.",
+        "source_url": "https://www.fsec.or.kr/",
+    },
+    {
+        "id": "FSS-INVEST-001",
+        "title": "리딩방·가상자산 투자사기 대응",
+        "authority": "금융감독원",
+        "risk_types": ["투자 사기", "금전 요구"],
+        "content": "원금·고수익 보장, 손실 복구, 출금 전 세금이나 증거금 선입금 요구를 신뢰하지 말고 추가 입금을 중단한 뒤 제도권 금융회사 여부를 확인합니다.",
+        "source_url": "https://fine.fss.or.kr/",
+    },
+    {
+        "id": "KNPA-MESSENGER-001",
+        "title": "지인·메신저 사칭 확인 절차",
+        "authority": "경찰청",
+        "risk_types": ["지인·메신저", "가족 빙자"],
+        "content": "새 번호, 통화 곤란을 이유로 돈이나 상품권을 요구하면 송금하지 말고 기존에 알던 번호로 당사자에게 직접 연락해 사실을 확인합니다.",
+        "source_url": "https://www.police.go.kr/",
+    },
+    {
+        "id": "FSEC-BEC-001",
+        "title": "기업 이메일·임원 사칭 BEC 대응",
+        "authority": "금융보안원",
+        "risk_types": ["기업 사칭 BEC"],
+        "content": "대표·사장·임원·재무이사 사칭으로 변경된 협력사 계좌에 대금 집행을 요구하거나 쿠폰·상품권 코드를 회신하라고 하면 기존 연락처와 승인 절차로 재확인합니다.",
+        "source_url": "https://www.fsec.or.kr/",
+    },
+    {
+        "id": "FSEC-AUTH-001",
+        "title": "OTP·인증정보 탈취 대응",
+        "authority": "금융보안원",
+        "risk_types": ["개인정보 요구"],
+        "content": "OTP·일회용암호·인증번호·공동인증서 비밀번호·선불카드 뒷면 숫자를 전화나 메신저로 읽어주거나 회신하지 않습니다.",
         "source_url": "https://www.fsec.or.kr/",
     },
     {
@@ -99,32 +177,46 @@ class ChatState(TypedDict, total=False):
     generation_error: str | None
     turn_count: int
     trace: Annotated[list[str], operator.add]
+    rule_risk: dict[str, Any]
+    structured_risk: dict[str, Any]
+    structured_fallback: bool
+    structured_error: str | None
+    incident_summary: str
+    incident_status: str
 
 
 def analyze_risk(text: str) -> dict[str, Any]:
     normalized = re.sub(r"\s+", " ", text.lower()).strip()
+    compact = re.sub(r"\s+", "", normalized)
     evidence: list[dict[str, Any]] = []
     type_scores: dict[str, int] = {}
     score = 0
-    for terms, weight, risk_type in RISK_RULES:
-        hits = sorted(term for term in terms if term.lower() in normalized)
-        if hits:
-            added = min(weight + (len(hits) - 1) * 5, 55)
-            score += added
-            type_scores[risk_type] = type_scores.get(risk_type, 0) + added
-            evidence.append({"type": risk_type, "keywords": hits, "score_added": added})
-    negation_hits = [term for term in NEGATIONS if term.lower() in normalized]
-    if negation_hits:
-        reduction = min(90, 35 + len(negation_hits) * 25)
-        score -= reduction
-        evidence.append({"type": "정상성 근거", "keywords": negation_hits, "score_added": -reduction})
-    already_transferred = bool(re.search(r"이미.*(송금|이체)|보냈|입금했", normalized))
+    clauses = [re.sub(r"\s+", "", clause) for clause in re.split(r"[.!?。！？\n]|(?:하지만|지만|그런데|그러나|다만|지금은)", normalized) if clause.strip()]
+    unsafe_clauses = ["" if any(re.search(pattern, clause) for pattern in NORMAL_CLAUSE_PATTERNS) else clause for clause in clauses]
+    detection_units = [clause for clause in unsafe_clauses if clause]
+    detection_units.extend(
+        unsafe_clauses[index] + unsafe_clauses[index + 1]
+        for index in range(len(unsafe_clauses) - 1)
+        if unsafe_clauses[index] and unsafe_clauses[index + 1]
+    )
+    for pattern, weight, risk_type, explanation in RISK_PATTERNS:
+        if any(re.search(pattern, clause) for clause in detection_units):
+            score += weight
+            type_scores[risk_type] = type_scores.get(risk_type, 0) + weight
+            evidence.append({"type": risk_type, "keywords": [explanation], "score_added": weight})
+    if any(not clause for clause in unsafe_clauses):
+        evidence.append({"type": "정상성 근거", "keywords": ["해당 절의 공식 확인·교육·일상거래 맥락"], "score_added": 0})
+    already_transferred = bool(
+        any(re.search(pattern, compact) for pattern in COMPLETED_ACTION_PATTERNS)
+        and re.search(SUSPICIOUS_TRANSFER_CONTEXT, compact)
+        and not re.search(SAFE_COMPLETED_CONTEXT, compact)
+    )
     if already_transferred:
         score = max(score, 75)
         type_scores["피해 발생"] = 75
         evidence.append({"type": "피해 발생", "keywords": ["송금·이체 완료 표현"], "score_added": 75})
     score = max(0, min(100, score))
-    risk_type = max(type_scores, key=type_scores.get) if score >= 40 and type_scores else "정상 절차"
+    risk_type = "피해 발생" if already_transferred else max(type_scores, key=type_scores.get) if score >= 40 and type_scores else "정상 절차"
     return {
         "score": score,
         "level": "위험" if score >= 70 else "주의" if score >= 40 else "안전",
@@ -136,24 +228,46 @@ def analyze_risk(text: str) -> dict[str, Any]:
 
 
 def _tokens(value: str) -> set[str]:
-    return {token for token in re.sub(r"[^0-9a-z가-힣\s]", " ", value.lower()).split() if len(token) > 1}
+    words = {token for token in re.sub(r"[^0-9a-z가-힣\s]", " ", value.lower()).split() if len(token) > 1}
+    bigrams = {
+        word[index:index + 2]
+        for word in words if re.search(r"[가-힣]", word)
+        for index in range(len(word) - 1)
+    }
+    return (words | bigrams) - {"하라고", "하라", "라고"}
 
 
 def retrieve_documents(query: str, risk_type: str) -> list[dict[str, Any]]:
+    eligible = tuple(doc for doc in KNOWLEDGE_BASE if risk_type in doc["risk_types"])
+    if not eligible:
+        eligible = tuple(doc for doc in KNOWLEDGE_BASE if "정상 절차" in doc["risk_types"]) if risk_type == "정상 절차" else ()
+    if not eligible:
+        return []
     query_tokens = _tokens(query)
+    lexical_scores = {
+        doc["id"]: len(query_tokens & _tokens(f"{doc['title']} {doc['content']}"))
+        for doc in eligible
+    }
+    if max(lexical_scores.values(), default=0) == 0:
+        if risk_type == "정상 절차":
+            return []
+        return [
+            {**doc, "lexical_rank": len(eligible), "semantic_rank": index + 1, "rerank_score": 0, "retrieval_mode": "policy_fallback"}
+            for index, doc in enumerate(eligible)
+        ][:3]
     lexical = sorted(
-        KNOWLEDGE_BASE,
-        key=lambda doc: len(query_tokens & _tokens(f"{doc['title']} {doc['content']}")),
+        eligible,
+        key=lambda doc: lexical_scores[doc["id"]],
         reverse=True,
     )
-    semantic = sorted(KNOWLEDGE_BASE, key=lambda doc: risk_type in doc["risk_types"], reverse=True)
+    semantic = sorted(eligible, key=lambda doc: risk_type in doc["risk_types"], reverse=True)
     lexical_rank = {doc["id"]: index + 1 for index, doc in enumerate(lexical)}
     semantic_rank = {doc["id"]: index + 1 for index, doc in enumerate(semantic)}
     ranked = []
-    for doc in KNOWLEDGE_BASE:
-        risk_type_bonus = 0.01 if risk_type in doc["risk_types"] else 0
-        score = 1 / (60 + lexical_rank[doc["id"]]) + 1 / (60 + semantic_rank[doc["id"]]) + risk_type_bonus
-        ranked.append({**doc, "lexical_rank": lexical_rank[doc["id"]], "semantic_rank": semantic_rank[doc["id"]], "rerank_score": score})
+    for doc in eligible:
+        risk_type_bonus = 0.007 if risk_type in doc["risk_types"] and lexical_scores[doc["id"]] > 0 else 0
+        score = 1 / (60 + lexical_rank[doc["id"]]) + 1 / (60 + semantic_rank[doc["id"]]) + risk_type_bonus + lexical_scores[doc["id"]] * 0.001
+        ranked.append({**doc, "lexical_rank": lexical_rank[doc["id"]], "semantic_rank": semantic_rank[doc["id"]], "rerank_score": score, "retrieval_mode": "hybrid"})
     return sorted(ranked, key=lambda doc: doc["rerank_score"], reverse=True)[:3]
 
 
@@ -227,34 +341,91 @@ async def call_ollama(messages: list[dict[str, str]]) -> str:
     return answer
 
 
+STRUCTURED_STATES = {"normal", "suspicious", "fraud", "victim"}
+STRUCTURED_POLARITIES = {"requested", "refused", "completed", "self_action"}
+STRUCTURED_DESTINATIONS = {"external", "self", "registered", "unknown"}
+
+
+async def call_ollama_structured(context: str) -> str:
+    schema = {
+        "state": "normal|suspicious|fraud|victim", "risk_type": "한국어 위험유형",
+        "completed_action": False, "external_actor": False,
+        "requested_asset": {"financial_value": False, "credential": False, "remote_control": False, "identity": False},
+        "action_polarity": "requested|refused|completed|self_action",
+        "destination": "external|self|registered|unknown", "confidence": 0.0, "evidence_spans": [],
+    }
+    return await call_ollama([{ "role": "system", "content": "금융사기 분류기다. 설명 없이 엄격한 JSON 객체만 출력한다." }, {
+        "role": "user", "content": f"스키마: {json.dumps(schema, ensure_ascii=False)}\n사건: {context}",
+    }])
+
+
+def parse_structured_risk(raw: str) -> dict[str, Any]:
+    value = json.loads(raw)
+    assets = value.get("requested_asset")
+    if value.get("state") not in STRUCTURED_STATES or value.get("action_polarity") not in STRUCTURED_POLARITIES:
+        raise ValueError("invalid structured enum")
+    if value.get("destination") not in STRUCTURED_DESTINATIONS or not isinstance(assets, dict):
+        raise ValueError("invalid destination/assets")
+    required_assets = {"financial_value", "credential", "remote_control", "identity"}
+    if set(assets) != required_assets or not all(isinstance(assets[key], bool) for key in required_assets):
+        raise ValueError("invalid requested_asset")
+    confidence = float(value.get("confidence"))
+    if not 0 <= confidence <= 1 or not isinstance(value.get("evidence_spans"), list):
+        raise ValueError("invalid confidence/evidence")
+    return {**value, "confidence": confidence}
+
+
+def fuse_risk(rule: dict[str, Any], structured: dict[str, Any]) -> dict[str, Any]:
+    fused = {**rule, "fusion": "rule+structured"}
+    state, confidence = structured["state"], structured["confidence"]
+    victim = state == "victim" or (structured["completed_action"] and structured["external_actor"])
+    if victim:
+        fused.update(score=max(rule["score"], 75), level="위험", verdict="사기", risk_type="피해 발생", already_transferred=True)
+    elif state == "fraud" and confidence >= 0.75:
+        fused.update(score=max(rule["score"], 70), level="위험", verdict="사기", risk_type=structured["risk_type"] or rule["risk_type"])
+    elif state == "suspicious" or confidence < 0.75 or ((state == "normal") != (rule["verdict"] == "정상")):
+        fused.update(score=max(rule["score"], 40), level="주의", verdict="사기")
+        if fused["risk_type"] == "정상 절차":
+            fused["risk_type"] = structured["risk_type"] or "복합 의심"
+    return fused
+
+
 def prepare_input(state: ChatState) -> dict[str, Any]:
     if not state.get("user_input", "").strip():
         raise ValueError("사용자 입력이 비어 있습니다.")
-    recent_user_messages = [
-        str(message.content).strip()
-        for message in state.get("messages", [])
-        if isinstance(message, HumanMessage) and str(message.content).strip()
-    ][-3:]
+    current = state["user_input"].strip()
+    closed = bool(re.search(
+        r"(정정|예문|예시|가정|실제로는.{0,20}(아니|않|없)|송금하지않|보내지않|설치하지않|새주제|다른질문|별개)",
+        re.sub(r"\s+", "", current.lower()),
+    ))
+    previous = state.get("incident_summary", "")
+    analysis_input = current if closed or not previous else f"{previous}\n{current}"
     return {
-        "user_input": state["user_input"].strip(),
-        "analysis_input": "\n".join(recent_user_messages),
+        "user_input": current,
+        "analysis_input": analysis_input,
+        "incident_summary": current if closed else analysis_input[-1200:],
+        "incident_status": "closed" if closed else "active",
         "provider": "ollama",
         "model": OLLAMA_MODEL,
         "trace": ["prepare_input"],
     }
 
 
-def risk_agent(state: ChatState) -> dict[str, Any]:
-    return {"risk": analyze_risk(state["analysis_input"]), "trace": ["risk_agent"]}
+async def structured_risk_agent(state: ChatState) -> dict[str, Any]:
+    rule = analyze_risk(state["analysis_input"])
+    try:
+        structured = parse_structured_risk(await call_ollama_structured(state["analysis_input"]))
+        return {"rule_risk": rule, "structured_risk": structured, "risk": fuse_risk(rule, structured), "structured_fallback": False, "structured_error": None, "trace": ["structured_risk_agent", "conservative_fusion"]}
+    except Exception as exc:
+        return {"rule_risk": rule, "structured_risk": {}, "risk": {**rule, "fusion": "rule_fallback"}, "structured_fallback": True, "structured_error": f"{type(exc).__name__}: {str(exc)[:180]}", "trace": ["structured_risk_agent_failed", "rule_risk_fallback"]}
 
 
 def knowledge_agent(state: ChatState) -> dict[str, Any]:
-    risk = analyze_risk(state["analysis_input"])
-    return {"documents": retrieve_documents(state["analysis_input"], risk["risk_type"]), "trace": ["knowledge_agent"]}
+    return {"documents": retrieve_documents(state["analysis_input"], state["risk"]["risk_type"]), "trace": ["knowledge_agent"]}
 
 
 def policy_agent(state: ChatState) -> dict[str, Any]:
-    return {"policy": recommend_policy(analyze_risk(state["analysis_input"])), "trace": ["policy_agent"]}
+    return {"policy": recommend_policy(state["risk"]), "trace": ["policy_agent"]}
 
 
 async def generate_answer(state: ChatState) -> dict[str, Any]:
@@ -378,17 +549,17 @@ def finalize(state: ChatState) -> dict[str, Any]:
 
 workflow = StateGraph(ChatState)
 workflow.add_node("prepare_input", prepare_input)
-workflow.add_node("risk_agent", risk_agent)
+workflow.add_node("structured_risk_agent", structured_risk_agent)
 workflow.add_node("knowledge_agent", knowledge_agent)
 workflow.add_node("policy_agent", policy_agent)
 workflow.add_node("ollama_generate", generate_answer)
 workflow.add_node("safety_verifier", safety_verifier)
 workflow.add_node("finalize", finalize)
 workflow.add_edge(START, "prepare_input")
-workflow.add_edge("prepare_input", "risk_agent")
-workflow.add_edge("prepare_input", "knowledge_agent")
-workflow.add_edge("prepare_input", "policy_agent")
-workflow.add_edge(["risk_agent", "knowledge_agent", "policy_agent"], "ollama_generate")
+workflow.add_edge("prepare_input", "structured_risk_agent")
+workflow.add_edge("structured_risk_agent", "knowledge_agent")
+workflow.add_edge("structured_risk_agent", "policy_agent")
+workflow.add_edge(["knowledge_agent", "policy_agent"], "ollama_generate")
 workflow.add_edge("ollama_generate", "safety_verifier")
 workflow.add_edge("safety_verifier", "finalize")
 workflow.add_edge("finalize", END)
@@ -417,6 +588,10 @@ async def run_chat(message: str, session_id: str) -> dict[str, Any]:
         "response_mode": result["response_mode"],
         "llm_invoked": bool(result["llm_invoked"]),
         "policy_guardrail_applied": bool(result["policy_guardrail_applied"]),
+        "structured_risk": result.get("structured_risk", {}),
+        "structured_fallback": bool(result.get("structured_fallback")),
+        "structured_error": result.get("structured_error"),
+        "incident_status": result.get("incident_status", "active"),
         "fallback_reason": (
             "ollama_call_failure"
             if result.get("generation_error")

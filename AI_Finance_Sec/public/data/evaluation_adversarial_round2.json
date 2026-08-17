@@ -1,0 +1,18 @@
+{
+  "version": "2026-08-13",
+  "purpose": "2차 QA에서 드러난 BEC·동의어·정상 자기행동 실패를 고정한 합성셋",
+  "cases": [
+    {"id":"r2-bec-01","family_id":"bec-vendor","text":"재무이사입니다. 변경된 협력사 계좌로 오늘 대금을 집행하세요.","label":"fraud","expected_risk_type":"기업 사칭 BEC","expected_top1":"FSEC-BEC-001"},
+    {"id":"r2-bec-02","family_id":"bec-code","text":"대표인데 회의 중입니다. 쿠폰 상품권 코드를 회신해 주세요.","label":"fraud","expected_risk_type":"기업 사칭 BEC","expected_top1":"FSEC-BEC-001"},
+    {"id":"r2-org-typo","family_id":"org-typo","text":"금융감독언 조사팀입니다. 임시보관계좌로 자금을 넘기세요.","label":"fraud","expected_risk_type":"기관 사칭","expected_top1":"FSS-ORG-001"},
+    {"id":"r2-app-anydesk","family_id":"app-anydesk","text":"애니데스크를 설치하고 화면에 뜬 연결 숫자를 읽어 주세요.","label":"fraud","expected_risk_type":"앱 설치","expected_top1":"FSEC-APP-001"},
+    {"id":"r2-otp-phrase","family_id":"otp-phrase","text":"검사입니다. 일회용 암호를 전화로 읽어 달라고 합니다.","label":"fraud","expected_risk_type":"개인정보 요구","expected_top1":"FSEC-AUTH-001"},
+    {"id":"r2-prepaid","family_id":"prepaid-code","text":"새 번호인 친구가 선불카드 뒷면 숫자를 회신해 달라고 합니다.","label":"fraud","expected_risk_type":"지인·메신저","expected_top1":"KNPA-MESSENGER-001"},
+    {"id":"r2-loan-deposit","family_id":"loan-recovery","text":"신용 복구 예탁금을 먼저 보내면 대출 한도가 복원됩니다.","label":"fraud","expected_risk_type":"대출 미끼","expected_top1":"FSS-LOAN-001"},
+    {"id":"r2-normal-seminar","family_id":"normal-seminar","text":"세미나 자료에서 임시보관계좌로 보내라는 사기 사례를 읽었습니다.","label":"normal","expected_risk_type":"정상 절차","expected_top1":"SAFE-NORMAL-001"},
+    {"id":"r2-normal-otp","family_id":"normal-own-otp","text":"본인이 연 공식 앱에 본인 OTP를 직접 입력해 이체를 승인했습니다.","label":"normal","expected_risk_type":"정상 절차","expected_top1":"SAFE-NORMAL-001"},
+    {"id":"r2-normal-exchange","family_id":"normal-own-exchange","text":"본인 명의 거래소에서 인증된 본인 계좌로 코인을 출금했습니다.","label":"normal","expected_risk_type":"정상 절차","expected_top1":"SAFE-NORMAL-001"},
+    {"id":"r2-mixed-org","family_id":"mixed-org-demand","text":"자료에는 안전계좌를 거절하라고 적혀 있습니다. 그런데 지금 검사가 임시보관계좌로 집행하라고 합니다.","label":"fraud","expected_risk_type":"기관 사칭","expected_top1":"FSS-ORG-001"},
+    {"id":"r2-mixed-app","family_id":"mixed-app-demand","text":"세미나에서는 원격 앱을 깔지 말라고 했지만 상담원이 애니데스크 연결 숫자를 지금 회신하래요.","label":"fraud","expected_risk_type":"앱 설치","expected_top1":"FSEC-APP-001"}
+  ]
+}

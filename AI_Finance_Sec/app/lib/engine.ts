@@ -1,3 +1,5 @@
+import evaluationDataset from "../../public/data/evaluation_cases.json";
+
 export type RiskLevel = "안전" | "주의" | "위험";
 export type ExpectedLabel = "정상" | "사기";
 
@@ -47,6 +49,7 @@ export type RetrievalResult = KnowledgeDocument & {
   lexicalRank: number;
   semanticRank: number;
   rerankScore: number;
+  retrievalMode: "hybrid" | "policy_fallback";
 };
 
 export const providers = [
@@ -142,7 +145,7 @@ export const knowledgeBase: KnowledgeDocument[] = [
     title: "기관사칭형 보이스피싱 대응",
     authority: "금융감독원",
     riskTypes: ["기관 사칭", "금전 요구"],
-    content: "수사기관과 금융기관은 전화로 안전계좌 이체를 요구하지 않습니다. 통화를 종료하고 상대가 알려준 번호가 아닌 공식 대표번호로 사실을 확인합니다.",
+    content: "수사기관과 금융기관은 안전계좌·임시보관계좌 이체나 자금 집행을 요구하지 않습니다. 통화를 종료하고 상대가 알려준 번호가 아닌 공식 대표번호로 사실을 확인합니다.",
     sourceUrl: "https://fine.fss.or.kr/",
     status: "current",
   },
@@ -151,7 +154,7 @@ export const knowledgeBase: KnowledgeDocument[] = [
     title: "보이스피싱 피해 직후 조치",
     authority: "경찰청",
     riskTypes: ["금전 요구", "피해 발생"],
-    content: "이미 송금했다면 1394에 신고·상담하고, 긴급한 상황은 112에 신고하며, 해당 금융회사에 연락해 지급정지를 요청하고 이체내역·계좌번호·통화·문자 기록을 보관합니다.",
+    content: "이미 송금하거나 상품권 코드·OTP·신분증·통장사본·공동인증서·금괴·가상자산을 전달했다면 1394에 신고·상담하고, 긴급한 상황은 112에 신고하며 금융회사에 지급정지를 요청합니다.",
     sourceUrl: "https://www.police.go.kr/",
     status: "current",
   },
@@ -160,7 +163,7 @@ export const knowledgeBase: KnowledgeDocument[] = [
     title: "대출빙자형 사기 예방",
     authority: "금융감독원",
     riskTypes: ["대출 미끼", "선입금 요구", "금전 요구"],
-    content: "정상 금융회사는 대출 실행 전에 개인 계좌로 수수료나 상환금을 먼저 보내라고 요구하지 않습니다. 공식 앱과 대표번호로 상품 존재 여부를 확인합니다.",
+    content: "정상 금융회사는 대출·신용복구 실행 전에 예탁금·보증료·작업비를 개인 계좌로 먼저 보내라고 요구하지 않습니다. 공식 앱과 대표번호로 확인합니다.",
     sourceUrl: "https://fine.fss.or.kr/",
     status: "current",
   },
@@ -169,7 +172,7 @@ export const knowledgeBase: KnowledgeDocument[] = [
     title: "가족빙자형 사기 확인 절차",
     authority: "경찰청",
     riskTypes: ["가족 빙자", "통제·협박"],
-    content: "상대와 통화를 종료한 뒤 가족 본인과 다른 가족에게 별도로 연락해 안전을 확인하고, 상대가 지정한 사람에게 현금을 전달하지 않습니다.",
+    content: "엄마·아들·딸을 사칭해 휴대폰 고장이나 친구 폰·새 번호라며 병원비와 돈을 요구하면 가족의 기존 번호로 확인하고 현금을 전달하지 않습니다.",
     sourceUrl: "https://www.police.go.kr/",
     status: "current",
   },
@@ -178,7 +181,52 @@ export const knowledgeBase: KnowledgeDocument[] = [
     title: "악성 앱과 원격제어 대응",
     authority: "금융보안원",
     riskTypes: ["앱 설치", "원격제어"],
-    content: "출처가 불분명한 앱과 원격제어 앱을 설치하지 않습니다. 이미 설치했다면 네트워크를 차단하고 다른 안전한 기기로 금융회사에 연락합니다.",
+    content: "출처가 불분명한 APK와 보안 프로그램을 실행하거나 팀뷰어·애니데스크 원격제어 앱과 연결 숫자를 제공하지 않습니다. 설치했다면 네트워크를 차단합니다.",
+    sourceUrl: "https://www.fsec.or.kr/",
+    status: "current",
+  },
+  {
+    id: "FSEC-SMISH-001",
+    title: "택배·환급 사칭 스미싱 대응",
+    authority: "금융보안원",
+    riskTypes: ["택배·환급", "개인정보 요구"],
+    content: "택배 주소 수정이나 환급금을 빌미로 문자 링크 접속과 금융정보 입력을 요구하면 링크를 열지 말고 해당 기관의 공식 앱과 대표번호에서 직접 확인합니다.",
+    sourceUrl: "https://www.fsec.or.kr/",
+    status: "current",
+  },
+  {
+    id: "FSS-INVEST-001",
+    title: "리딩방·가상자산 투자사기 대응",
+    authority: "금융감독원",
+    riskTypes: ["투자 사기", "금전 요구"],
+    content: "원금·고수익 보장, 손실 복구, 출금 전 세금이나 증거금 선입금 요구를 신뢰하지 말고 추가 입금을 중단한 뒤 제도권 금융회사 여부를 확인합니다.",
+    sourceUrl: "https://fine.fss.or.kr/",
+    status: "current",
+  },
+  {
+    id: "KNPA-MESSENGER-001",
+    title: "지인·메신저 사칭 확인 절차",
+    authority: "경찰청",
+    riskTypes: ["지인·메신저", "가족 빙자"],
+    content: "새 번호, 통화 곤란을 이유로 돈이나 상품권을 요구하면 송금하지 말고 기존에 알던 번호로 당사자에게 직접 연락해 사실을 확인합니다.",
+    sourceUrl: "https://www.police.go.kr/",
+    status: "current",
+  },
+  {
+    id: "FSEC-BEC-001",
+    title: "기업 이메일·임원 사칭 BEC 대응",
+    authority: "금융보안원",
+    riskTypes: ["기업 사칭 BEC"],
+    content: "대표·사장·임원·재무이사 사칭으로 변경된 협력사 계좌에 대금 집행을 요구하거나 쿠폰·상품권 코드를 회신하라고 하면 기존 연락처와 승인 절차로 재확인합니다.",
+    sourceUrl: "https://www.fsec.or.kr/",
+    status: "current",
+  },
+  {
+    id: "FSEC-AUTH-001",
+    title: "OTP·인증정보 탈취 대응",
+    authority: "금융보안원",
+    riskTypes: ["개인정보 요구"],
+    content: "OTP·일회용암호·인증번호·공동인증서 비밀번호·선불카드 뒷면 숫자를 전화나 메신저로 읽어주거나 회신하지 않습니다.",
     sourceUrl: "https://www.fsec.or.kr/",
     status: "current",
   },
@@ -193,40 +241,90 @@ export const knowledgeBase: KnowledgeDocument[] = [
   },
 ];
 
-const fraudSignals: Array<{ terms: string[]; weight: number; type: string }> = [
-  { terms: ["안전계좌", "검찰", "수사관", "금감원"], weight: 28, type: "기관 사칭" },
-  { terms: ["지금 즉시", "오늘 안에", "전화 끊으면", "비밀"], weight: 20, type: "긴급성" },
-  { terms: ["이체", "송금", "수수료", "현금", "지정 계좌"], weight: 30, type: "금전 요구" },
-  { terms: ["대출", "대환대출", "선입금"], weight: 34, type: "대출 미끼" },
-  { terms: ["앱 설치", "앱을 설치", "원격제어", "apk", "링크", "설치하세요"], weight: 42, type: "앱 설치" },
-  { terms: ["자녀", "따님", "아들", "사고", "납치"], weight: 30, type: "가족 빙자" },
+type RiskPattern = { pattern: RegExp; weight: number; type: string; evidence: string };
+
+// 띄어쓰기 회피를 막기 위해 공백을 제거한 문장에 적용한다. 단일 위험 단어가
+// 아니라 맥락 조합을 점수화하여 정상 상담·뉴스 인용의 오탐을 줄인다.
+const riskPatterns: RiskPattern[] = [
+  { pattern: /(검찰|검사|수사관|금감원|금융감독원|금융감독언|법원|구속영장).{0,35}(범죄|연루|혐의|영장|계좌|자금|돈|소명)/, weight: 42, type: "기관 사칭", evidence: "수사·감독기관 사칭 맥락" },
+  { pattern: /(안전|보호|보안|검수|별도|임시보관)계좌.{0,24}(이체|송금|옮겨|보내|입금|넘기|넘겨|집행)|(?:이체|송금|옮겨|보내|입금|넘기|넘겨|집행).{0,24}(안전|보호|보안|검수|별도|임시보관)계좌/, weight: 42, type: "기관 사칭", evidence: "보호 명목 계좌 이동 요구" },
+  { pattern: /(대출|대환|신용점수|신용복구|한도|3퍼센트상품).{0,45}(수수료|선입금|먼저상환|작업비|보증료|예탁금|처리)|(?:수수료|선입금|작업비|보증료|예탁금).{0,35}(대출|한도|상품|승인|실행|신용복구)/, weight: 50, type: "대출 미끼", evidence: "대출 실행 전 비용 요구" },
+  { pattern: /(원격제어|보안프로그램|보안앱|apk|팀뷰어|애니데스크|연결숫자).{0,32}(설치|깔아|받아|실행|인증|읽어|회신|알려)|(?:설치|깔아|받아|실행).{0,24}(원격제어|보안프로그램|보안앱|apk|팀뷰어|애니데스크)/, weight: 52, type: "앱 설치", evidence: "원격제어·비공식 앱 실행 요구" },
+  { pattern: /(택배|배송|소포|환급|과오납|국세).{0,55}(링크|주소|페이지|bit점ly|카드번호|계좌비밀번호|인증|결제)/, weight: 48, type: "택배·환급", evidence: "택배·환급 미끼 정보입력 요구" },
+  { pattern: /(리딩방|코인|가상자산|거래소|손실복구|증거금).{0,55}(원금|수익|보장|입금|송금|세금|먼저|보태|회수|출금)/, weight: 50, type: "투자 사기", evidence: "투자수익·출금 명목 선입금" },
+  { pattern: /(재무이사|대표|사장|임원).{0,65}(변경된?협력사계좌|협력사계좌변경|대금집행|쿠폰|상품권|코드).{0,25}(송금|이체|집행|회신|보내|알려)|(?:변경된?협력사계좌|대금집행).{0,45}(대표|사장|임원|재무이사)/, weight: 55, type: "기업 사칭 BEC", evidence: "임원 사칭 결제·코드 요구" },
+  { pattern: /(부장님|사장님|친구|지인|새번호|친구폰|회의중|통화못|전화는안돼).{0,55}(상품권|핀번호|돈|병원비|빌려|보내|결제|회신)/, weight: 48, type: "지인·메신저", evidence: "지인 사칭 비대면 금전 요구" },
+  { pattern: /(따님|자녀|아들|딸|엄마나|아빠나).{0,55}(사고|수술|잡혀|납치|휴대폰.*고장|친구폰|돈|현금|계좌|보내)|(?:사고|수술|잡혀|납치).{0,45}(현금|돈|전달|넘기)/, weight: 52, type: "가족 빙자", evidence: "가족 위급상황·금전 요구" },
+  { pattern: /(계좌비밀번호|카드번호|인증번호|인증코드|otp|일회용암호|공동인증서|선불카드뒷면숫자).{0,25}(입력|알려|보내|인증|읽어|회신|넘기)/, weight: 45, type: "개인정보 요구", evidence: "금융 인증정보 요구" },
+  { pattern: /(지금|오늘|즉시|바로|전화끊지|비밀|말하지).{0,35}(보내|송금|이체|입금|전달|준비|옮겨)/, weight: 18, type: "긴급성", evidence: "긴급·고립 압박" },
+  { pattern: /(돈|자금|현금|금액|수수료|보증료|작업비).{0,24}(보내|송금|이체|입금|전달|넘기|준비)|(?:송금|이체|입금).{0,15}(하세요|해라|해주세요|해야|부탁)/, weight: 24, type: "금전 요구", evidence: "금전 이동 요구" },
 ];
 
-const negations = ["필요는 없습니다", "요구하지 않습니다", "하지 마세요", "불필요", "대표번호로 다시"];
+const normalClausePatterns = [
+  /(?:뉴스|기사|보도).{0,30}(사건|사례|보도)/,
+  /(?:교육|예방|예방법).{0,45}(배웠|의심|하지말|누르지말|설치하지말|입금하지말)/,
+  /(?:신고|제보).{0,35}(가져왔|하려고).{0,30}(보내지않|입금하지않|이체하지않)/,
+  /(?:제가|직접).{0,25}(신청|요청).{0,35}(공식앱|대표번호).{0,35}(필요없|요구하지않|확인)/,
+  /(?:고객|제가).{0,40}(요청|신청).{0,80}(송금|설치).{0,18}(필요없|필요는없)/,
+  /(?:은행|직원|상담원).{0,35}(요구하지않|보내지않|링크를보내지않).{0,35}(대표번호|공식앱|다시확인|확인)/,
+  /(?:등록된|평소쓰던).{0,25}(아들|딸|부모님|가족|계좌).{0,35}(생활비|학원비|병원비|송금|이체|입금)/,
+  /(?:앱스토어|공식스토어).{0,25}(은행)?공식앱.{0,25}(설치|검색)/,
+  /택배사공식앱.{0,35}(배송주소|주소).{0,35}(수정|변경)/,
+  /제가.{0,20}(신청|요청).{0,20}(대출|상담)/,
+  /(?:신고|제보).{0,30}(하려고|가져왔)/,
+  /공식앱.{0,35}(필요없|필요는없|요구하지않|확인)/,
+  /(?:세미나|교육|뉴스|기사|자료).{0,55}(읽었|배웠|나왔|사례)/,
+  /본인이연공식앱.{0,35}(otp|일회용암호).{0,20}(직접입력)/,
+  /본인명의거래소.{0,35}(인증된본인계좌|본인개인지갑).{0,20}(출금|전송)/,
+  /업무용법인카드.{0,20}(직원|동료).{0,15}(전달|건넸)/,
+];
+
+const completedActionPatterns = [
+  /이미.{0,15}(송금|이체)|(?:돈|자금).{0,12}(보냈|입금했|송금했|이체했|전송했)|알려준곳에입금했|요구한대로.{0,15}(보냈|입금했|송금했|이체했)/,
+  /(?:상품권|기프트카드).{0,20}(핀번호|pin|번호).{0,20}(보냈|알려|전달)/,
+  /(?:현금|카드).{0,20}(전달했|건넸|줬|넘겼)/,
+  /(?:otp|인증번호|인증코드|비밀번호).{0,20}(알려|보냈|제공|입력)/,
+  /(?:원격제어|팀뷰어|보안앱|apk).{0,20}(설치했|깔았|실행했)/,
+  /(?:코인|가상자산|비트코인|테더).{0,25}(보냈|전송했|출금했)/,
+  /(?:신분증).{0,15}(통장사본).{0,20}(보냈|제공|넘겼)|(?:통장사본).{0,15}(신분증).{0,20}(보냈|제공|넘겼)/,
+  /(?:공동인증서).{0,20}(비밀번호).{0,20}(알려|보냈|제공|넘겼)/,
+  /(?:금괴|골드바|문화상품권).{0,25}(전달했|건넸|보냈|번호를알려)/,
+];
+const suspiciousTransferContext = /(이미송금|이미이체|검찰|검사|수사관|금감원|법원|모르는사람|요구한대로|그쪽|알려준곳|사기|연락이끊|새번호|직원에게|상담원|리딩방|출금잠금|대표가|임원이|재무이사)/;
+const safeCompletedContext = /업무용법인카드.{0,20}(직원|동료).{0,15}(전달|건넸)|본인명의거래소.{0,35}(인증된본인계좌|본인개인지갑).{0,20}(출금|전송)|본인이연공식앱.{0,35}(otp|일회용암호).{0,20}(직접입력)/;
+
+function compactClauses(value: string): string[] {
+  return value
+    .split(/[.!?。！？\n]|(?:하지만|지만|그런데|그러나|다만|지금은)/g)
+    .map((clause) => clause.replace(/\s+/g, ""))
+    .filter(Boolean);
+}
 
 export function analyzeText(text: string, transactionRisk = 0): DetectionResult {
   const normalized = text.replace(/\s+/g, " ").trim().toLowerCase();
+  const compact = normalized.replace(/\s+/g, "");
   const evidence: string[] = [];
   const typeScores = new Map<string, number>();
   let score = Math.min(transactionRisk, 30);
 
-  for (const signal of fraudSignals) {
-    const hits = signal.terms.filter((term) => normalized.includes(term.toLowerCase()));
-    if (hits.length > 0) {
-      const added = Math.min(signal.weight + (hits.length - 1) * 5, 45);
-      score += added;
-      typeScores.set(signal.type, (typeScores.get(signal.type) ?? 0) + added);
-      evidence.push(`${signal.type}: ${hits.join("·")}`);
+  const clauses = compactClauses(normalized);
+  const unsafeClauses = clauses.map((clause) => normalClausePatterns.some((pattern) => pattern.test(clause)) && !/(하지만|그런데|그러나|다만)/.test(clause) ? "" : clause);
+  const detectionUnits = [...unsafeClauses.filter(Boolean)];
+  for (let index = 0; index < unsafeClauses.length - 1; index += 1) {
+    if (unsafeClauses[index] && unsafeClauses[index + 1]) detectionUnits.push(`${unsafeClauses[index]}${unsafeClauses[index + 1]}`);
+  }
+  for (const signal of riskPatterns) {
+    if (detectionUnits.some((clause) => signal.pattern.test(clause))) {
+      score += signal.weight;
+      typeScores.set(signal.type, (typeScores.get(signal.type) ?? 0) + signal.weight);
+      evidence.push(`${signal.type}: ${signal.evidence}`);
     }
   }
+  if (unsafeClauses.some((clause) => !clause)) evidence.push("정상성 근거: 해당 절의 공식 확인·교육·일상거래 맥락");
 
-  const negationHits = negations.filter((term) => normalized.includes(term.toLowerCase()));
-  if (negationHits.length > 0) {
-    score -= Math.min(90, 35 + negationHits.length * 25);
-    evidence.push(`정상성 근거: ${negationHits.join("·")}`);
-  }
-
-  const alreadyTransferred = /이미.*(송금|이체)|보냈|입금했/.test(normalized);
+  const alreadyTransferred = completedActionPatterns.some((pattern) => pattern.test(compact))
+    && suspiciousTransferContext.test(compact)
+    && !safeCompletedContext.test(compact);
   if (alreadyTransferred) {
     score = Math.max(score, 75);
     typeScores.set("피해 발생", 75);
@@ -236,7 +334,7 @@ export function analyzeText(text: string, transactionRisk = 0): DetectionResult 
   score = Math.max(0, Math.min(100, score));
   const level: RiskLevel = score >= 70 ? "위험" : score >= 40 ? "주의" : "안전";
   const verdict: ExpectedLabel = score >= 40 ? "사기" : "정상";
-  const riskType = score < 40 ? "정상 절차" : [...typeScores.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "정상 절차";
+  const riskType = alreadyTransferred ? "피해 발생" : score < 40 ? "정상 절차" : [...typeScores.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "정상 절차";
   const actions = verdict === "정상"
     ? ["공식 대표번호·앱에서 상담 내용 재확인", "불필요한 개인정보는 제공하지 않기"]
     : ["통화 즉시 종료", "추가 송금·앱 설치 중단", "증거 보관", "1394 신고·상담", "긴급 시 112 신고", "해당 금융회사에 지급정지 요청"];
@@ -245,11 +343,16 @@ export function analyzeText(text: string, transactionRisk = 0): DetectionResult 
 }
 
 function tokenize(value: string): string[] {
-  return value
+  const stopTokens = new Set(["하라고", "하라", "라고"]);
+  const words = value
     .toLowerCase()
     .replace(/[^0-9a-z가-힣\s]/g, " ")
     .split(/\s+/)
     .filter((token) => token.length > 1);
+  const koreanBigrams = words.flatMap((word) => /[가-힣]/.test(word)
+    ? [...word].slice(0, -1).map((character, index) => `${character}${word[index + 1]}`)
+    : []);
+  return [...new Set([...words, ...koreanBigrams])].filter((token) => !stopTokens.has(token));
 }
 
 function rankByScore<T>(items: T[], scorer: (item: T) => number): Map<T, number> {
@@ -257,9 +360,17 @@ function rankByScore<T>(items: T[], scorer: (item: T) => number): Map<T, number>
 }
 
 export function retrieveAndRerank(query: string, riskType: string): RetrievalResult[] {
-  const currentDocs = knowledgeBase.filter((doc) => doc.status === "current");
+  const currentDocs = knowledgeBase.filter((doc) => doc.status === "current" && doc.riskTypes.includes(riskType));
+  if (currentDocs.length === 0) return [];
   const queryTokens = new Set(tokenize(query));
   const lexicalScore = (doc: KnowledgeDocument) => tokenize(`${doc.title} ${doc.content}`).filter((token) => queryTokens.has(token)).length;
+  const lexicalScores = new Map(currentDocs.map((doc) => [doc, lexicalScore(doc)]));
+  if (Math.max(...lexicalScores.values()) === 0) {
+    if (riskType === "정상 절차") return [];
+    return currentDocs.filter((doc) => doc.riskTypes.includes(riskType)).slice(0, 3).map((doc, index) => ({
+      ...doc, lexicalRank: currentDocs.length, semanticRank: index + 1, rerankScore: 0, retrievalMode: "policy_fallback" as const,
+    }));
+  }
   const semanticScore = (doc: KnowledgeDocument) => doc.riskTypes.includes(riskType) ? 3 : doc.riskTypes.some((type) => query.includes(type)) ? 2 : 0;
   const lexicalRanks = rankByScore(currentDocs, lexicalScore);
   const semanticRanks = rankByScore(currentDocs, semanticScore);
@@ -270,9 +381,9 @@ export function retrieveAndRerank(query: string, riskType: string): RetrievalRes
       const semanticRank = semanticRanks.get(doc) ?? currentDocs.length;
       // RRF 순위를 뒤집지 않는 작은 tie-breaker만 적용한다.
       const authorityBonus = ["금융감독원", "경찰청", "금융보안원"].includes(doc.authority) ? 0.000001 : 0;
-      const riskTypeBonus = doc.riskTypes.includes(riskType) ? 0.01 : 0;
-      const rerankScore = 1 / (60 + lexicalRank) + 1 / (60 + semanticRank) + riskTypeBonus + authorityBonus;
-      return { ...doc, lexicalRank, semanticRank, rerankScore };
+      const riskTypeBonus = doc.riskTypes.includes(riskType) && (lexicalScores.get(doc) ?? 0) > 0 ? 0.007 : 0;
+      const rerankScore = 1 / (60 + lexicalRank) + 1 / (60 + semanticRank) + riskTypeBonus + authorityBonus + (lexicalScores.get(doc) ?? 0) * 0.001;
+      return { ...doc, lexicalRank, semanticRank, rerankScore, retrievalMode: "hybrid" as const };
     })
     .sort((a, b) => b.rerankScore - a.rerankScore)
     .slice(0, 3);
@@ -299,19 +410,12 @@ export function verifyAnswer(answer: string, result: DetectionResult): { passed:
   return { passed: checks.every((check) => !/부족|누락|감지$/.test(check)), checks };
 }
 
-const evaluationCases = [
-  { text: "검찰 수사관입니다. 안전계좌로 지금 즉시 이체하세요.", label: "사기" as const },
-  { text: "대출 수수료를 지정 계좌에 오늘 안에 보내주세요.", label: "사기" as const },
-  { text: "따님이 사고를 당했으니 현금을 직원에게 전달하세요.", label: "사기" as const },
-  { text: "링크를 눌러 원격제어 앱을 설치하세요.", label: "사기" as const },
-  { text: "제가 요청한 대출 상담이고 지금 송금할 필요는 없습니다.", label: "정상" as const },
-  { text: "공식 앱에서 금리와 수수료를 확인했습니다.", label: "정상" as const },
-  { text: "가족에게 생활비를 송금했어요.", label: "정상" as const },
-  { text: "상담을 원하지 않으면 대표번호로 다시 연락해주세요.", label: "정상" as const },
-];
-
 export function calculateEvaluation() {
-  const rows = evaluationCases.map((item) => ({ ...item, predicted: analyzeText(item.text).verdict }));
+  const rows = evaluationDataset.cases.map((item) => ({
+    ...item,
+    label: item.label === "fraud" ? "사기" as const : "정상" as const,
+    predicted: analyzeText(item.text).verdict,
+  }));
   const tp = rows.filter((row) => row.label === "사기" && row.predicted === "사기").length;
   const tn = rows.filter((row) => row.label === "정상" && row.predicted === "정상").length;
   const fp = rows.filter((row) => row.label === "정상" && row.predicted === "사기").length;
