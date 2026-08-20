@@ -23,13 +23,18 @@ const defaults: Record<Provider, string> = {
 
 const CLOUD_TIMEOUT_MS = 60_000;
 
+// The local path runs two CPU-bound Ollama calls (structured judgement, then
+// generation), so it needs far more headroom than a hosted provider. Override
+// with LOCAL_TIMEOUT_MS when demoing on slower hardware.
+const LOCAL_TIMEOUT_MS = Number(process.env.LOCAL_TIMEOUT_MS ?? 180_000);
+
 async function callLocalLangGraph(body: ChatRequest) {
   const baseUrl = (process.env.FASTAPI_BASE_URL ?? "http://127.0.0.1:8000").replace(/\/$/, "");
   const response = await fetch(`${baseUrl}/api/chat`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ message: String(body.message ?? "").slice(0, 2000), session_id: body.sessionId }),
-    signal: AbortSignal.timeout(60_000),
+    signal: AbortSignal.timeout(LOCAL_TIMEOUT_MS),
   });
   const data = await response.json() as Record<string, unknown> & { error?: string; detail?: string };
   if (!response.ok) throw new Error(data.error ?? data.detail ?? `FastAPI error ${response.status}`);

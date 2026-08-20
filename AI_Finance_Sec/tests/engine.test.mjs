@@ -1,9 +1,23 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import ts from "typescript";
+
+// `python3` does not exist on Windows, where it resolves to a Microsoft Store
+// stub. Prefer an explicit override, then the project venv, then the platform
+// default so the parity check runs identically on macOS, Linux and Windows.
+function pythonBin() {
+  if (process.env.PYTHON_BIN) return process.env.PYTHON_BIN;
+  const venv = process.platform === "win32"
+    ? new URL("../backend/.venv/Scripts/python.exe", import.meta.url)
+    : new URL("../backend/.venv/bin/python", import.meta.url);
+  const venvPath = fileURLToPath(venv);
+  if (existsSync(venvPath)) return venvPath;
+  return process.platform === "win32" ? "python" : "python3";
+}
 
 async function engine() {
   const source = await readFile(new URL("../app/lib/engine.ts", import.meta.url), "utf8");
@@ -74,7 +88,7 @@ exec(compile(ast.fix_missing_locations(module), graph_path, "exec"), scope)
 dataset = json.load(open(dataset_path, encoding="utf-8"))
 print(json.dumps([scope["analyze_risk"](case["text"]) for case in dataset["cases"]], ensure_ascii=False))
 `;
-  const pythonResults = JSON.parse(execFileSync("python3", [
+  const pythonResults = JSON.parse(execFileSync(pythonBin(), [
     "-c",
     pythonProgram,
     fileURLToPath(new URL("../backend/app/graph.py", import.meta.url)),

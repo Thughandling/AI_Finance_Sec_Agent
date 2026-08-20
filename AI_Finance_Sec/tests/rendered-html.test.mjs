@@ -50,17 +50,26 @@ test("rejects an external-model call without a key", async () => {
 });
 
 test("returns a clear error when the local FastAPI proxy is unavailable", async () => {
-  const response = await (await worker()).fetch(
-    new Request("http://localhost/api/chat", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ provider: "ollama", message: "테스트", sessionId: "test-session" }),
-    }),
-    env,
-    context,
-  );
-  assert.equal(response.status, 503);
-  assert.match(await response.text(), /로컬 FastAPI\/Ollama/);
+  // Point at the discard port so the assertion holds whether or not a real
+  // FastAPI backend happens to be running on :8000 during the test run.
+  const previous = process.env.FASTAPI_BASE_URL;
+  process.env.FASTAPI_BASE_URL = "http://127.0.0.1:9";
+  try {
+    const response = await (await worker()).fetch(
+      new Request("http://localhost/api/chat", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ provider: "ollama", message: "테스트", sessionId: "test-session" }),
+      }),
+      env,
+      context,
+    );
+    assert.equal(response.status, 503);
+    assert.match(await response.text(), /로컬 FastAPI\/Ollama/);
+  } finally {
+    if (previous === undefined) delete process.env.FASTAPI_BASE_URL;
+    else process.env.FASTAPI_BASE_URL = previous;
+  }
 });
 
 test("keeps BYOK credentials ephemeral in application source", async () => {

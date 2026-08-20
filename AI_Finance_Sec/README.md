@@ -13,6 +13,10 @@
 
 ## 로컬 실행
 
+> **Windows 사용자는 [`RUN_WINDOWS.md`](./RUN_WINDOWS.md)를 사용하세요.** 아래 명령은 macOS·Linux 기준입니다.
+> Windows에서는 `npm run dev`의 `VAR=x cmd` 접두사가 파싱되지 않으므로 `dev:win`·`build:win`·`start:win`·`test:win` 스크립트를 사용하고,
+> Ollama·FastAPI·Next·공개 터널은 `scripts/start-demo.ps1`이 한 번에 기동합니다.
+
 Node.js 22.13 이상에서 다음 명령을 실행합니다.
 
 ```bash
