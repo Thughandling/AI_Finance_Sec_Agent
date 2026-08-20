@@ -22,6 +22,7 @@ B2B2C 고객보호 계층을 지향한다.
 | `output/pdf/` | 전체 프로세스 플로우차트 (가로형 2p PDF) |
 | `outputs/` | 파일관리목록대장 (XLSX) |
 | `tmp/` | 산출물 생성 스크립트 (렌더 이미지는 ignore) |
+| `.claude/agents/` | Claude Code 서브에이전트 5종 — 평가·동등성·안전·문서정합·형상관리 |
 | `Edit.md` | 전체 작업 대화 기록 |
 
 ---
