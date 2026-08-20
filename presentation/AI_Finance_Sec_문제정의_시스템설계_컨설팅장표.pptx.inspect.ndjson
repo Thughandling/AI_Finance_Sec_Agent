@@ -1,0 +1,220 @@
+{"kind":"deck","id":"pr/cj33dd","name":"Deck"}
+{"kind":"layout","layoutId":"7d0815f7-ad5f-4eea-8a58-3a805377340d","name":"Master","type":"master"}
+{"kind":"layout","layoutId":"bc2e43da-0e19-47cb-889e-23573db3c738","name":"Title Slide","type":"title"}
+{"kind":"slide","id":"sl/nlgk90","slide":1,"title":"2026 금융 AI Challenge · CONSULTING DECK","textShapes":6}
+{"kind":"shape","id":"sh/dcvidkb6","slide":1,"bbox":[0,0,18,720]}
+{"kind":"textbox","id":"sh/qp4z25cf","slide":1,"text":"2026 금융 AI Challenge · CONSULTING DECK","textPreview":"2026 금융 AI Challenge · CONSULTING DECK","textChars":38,"textLines":1,"bbox":[74,70,325,30]}
+{"kind":"textbox","id":"sh/rqd0bat0","slide":1,"text":"송금 직전,\n고객은 왜 멈추지 못하는가","textPreview":"송금 직전, | 고객은 왜 멈추지 못하는가","textChars":21,"textLines":2,"bbox":[74,150,720,190]}
+{"kind":"textbox","id":"sh/0f618fuh","slide":1,"text":"AI_Finance_Sec","textPreview":"AI_Finance_Sec","textChars":14,"textLines":1,"bbox":[74,382,480,48]}
+{"kind":"textbox","id":"sh/1gfihkb2","slide":1,"text":"문제 정의와 시스템 설계","textPreview":"문제 정의와 시스템 설계","textChars":13,"textLines":1,"bbox":[74,430,560,44]}
+{"kind":"textbox","id":"sh/edoj6pcr","slide":1,"text":"위험 신호를\n‘멈춤·확인·신고’ 행동으로","textPreview":"위험 신호를 | ‘멈춤·확인·신고’ 행동으로","textChars":22,"textLines":2,"bbox":[850,178,330,240]}
+{"kind":"textbox","id":"sh/fex0fatc","slide":1,"text":"현재 합성 MVP와 목표 POC 구조를 구분해 설명합니다.","textPreview":"현재 합성 MVP와 목표 POC 구조를 구분해 설명합니다.","textChars":32,"textLines":1,"bbox":[74,602,800,36]}
+{"kind":"notes","id":"nt/nlgk90","slide":1,"text":"발표의 질문은 기술이 아니라 고객의 마지막 의사결정이다.\n이 자료는 문제정의와 시스템설계만 다룬다.\n\n[Sources]\n- https://daker.ai/public/hackathons/2026-finance-ai-challenge\n[/Sources]"}
+{"kind":"slide","id":"sl/y5uufp","slide":2,"title":"02","textShapes":13}
+{"kind":"textbox","id":"sh/87edwbit","slide":2,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[52,42,48,28]}
+{"kind":"textbox","id":"sh/765cnqh8","slide":2,"text":"01 · PROBLEM SCALE","textPreview":"01 · PROBLEM SCALE","textChars":18,"textLines":1,"bbox":[108,42,330,28]}
+{"kind":"textbox","id":"sh/m5wbul03","slide":2,"text":"피해액은 줄었지만, 고객의 ‘마지막 판단’ 문제는 남아 있다","textPreview":"피해액은 줄었지만, 고객의 ‘마지막 판단’ 문제는 남아 있다","textChars":33,"textLines":1,"bbox":[52,76,1170,62]}
+{"kind":"shape","id":"sh/hc7ut0zq","slide":2,"bbox":[52,142,1176,2]}
+{"kind":"textbox","id":"sh/wbedkvi5","slide":2,"text":"보이스피싱 피해액","textPreview":"보이스피싱 피해액","textChars":9,"textLines":1,"bbox":[64,180,260,30]}
+{"kind":"shape","id":"sh/va5crqhk","slide":2,"bbox":[100,422.28,235,129.72]}
+{"kind":"textbox","id":"sh/u9wvil0z","slide":2,"text":"3,243억","textPreview":"3,243억","textChars":6,"textLines":1,"bbox":[100,378.28,235,36]}
+{"kind":"textbox","id":"sh/507ux0zm","slide":2,"text":"2024 상반기","textPreview":"2024 상반기","textChars":8,"textLines":1,"bbox":[100,566,235,30]}
+{"kind":"shape","id":"sh/4zydovi1","slide":2,"bbox":[390,295.16,235,256.84]}
+{"kind":"textbox","id":"sh/i5knu9wz","slide":2,"text":"6,421억","textPreview":"6,421억","textChars":6,"textLines":1,"bbox":[390,251.16,235,36]}
+{"kind":"textbox","id":"sh/j6tonexk","slide":2,"text":"2025 상반기","textPreview":"2025 상반기","textChars":8,"textLines":1,"bbox":[390,566,235,30]}
+{"kind":"shape","id":"sh/4725wje5","slide":2,"bbox":[680,463,235,89]}
+{"kind":"textbox","id":"sh/58b6pofq","slide":2,"text":"2,225억","textPreview":"2,225억","textChars":6,"textLines":1,"bbox":[680,419,235,36]}
+{"kind":"textbox","id":"sh/694nytwb","slide":2,"text":"2026년 1~4월","textPreview":"2026년 1~4월","textChars":10,"textLines":1,"bbox":[680,566,235,30]}
+{"kind":"textbox","id":"sh/radoryxw","slide":2,"text":"+98.1%","textPreview":"+98.1%","textChars":6,"textLines":1,"bbox":[548,208,135,42]}
+{"kind":"textbox","id":"sh/sbm503e1","slide":2,"text":"핵심 해석\n\n범정부 대응으로 2026년 1~4월 피해액은 전년 동기 대비 48% 감소했습니다.\n\n그러나 공격자는 통화·문자·앱·거래를 조합하며, 고객은 압박 속에서 ‘지금 무엇을 해야 하는가’를 판단해야 합니다.","textPreview":"핵심 해석 |  | 범정부 대응으로 2026년 1~4월 피해액은 전년 동기 대비 48% 감소했습니다. |  | 그러나 공격자는 통화·문자·앱·거래를 조합하며, 고객은 압박 속에서 ‘지금 무엇을 해야 하는가’를 판단해야 합니다.","textChars":118,"textLines":5,"bbox":[960,180,250,390]}
+{"kind":"textbox","id":"sh/tcv6t8fm","slide":2,"text":"AI_Finance_Sec · 2026.08.16 · 문제정의/시스템설계","textPreview":"AI_Finance_Sec · 2026.08.16 · 문제정의/시스템설계","textChars":40,"textLines":1,"bbox":[52,684,900,18]}
+{"kind":"notes","id":"nt/y5uufp","slide":2,"text":"통계는 서비스 성과가 아니라 문제의 규모를 보여주는 근거다.\n2026 수치는 1~4월이므로 상반기 수치와 직접 비교하지 않는다.\n\n[Sources]\n- https://www.police.go.kr/user/bbs/BD_selectBbs.do?q_bbsCode=1007&q_bbscttSn=20260526143737248&q_currPage=1&q_rowPerPage=12&q_sortName=&q_sortOrder=&q_tab=\n[/Sources]"}
+{"kind":"slide","id":"sl/5uyw64","slide":3,"title":"03","textShapes":11}
+{"kind":"textbox","id":"sh/m1wjmhs3","slide":3,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[52,42,48,28]}
+{"kind":"textbox","id":"sh/947ihwbu","slide":3,"text":"01 · USER JOURNEY","textPreview":"01 · USER JOURNEY","textChars":17,"textLines":1,"bbox":[108,42,330,28]}
+{"kind":"textbox","id":"sh/o3e1ora9","slide":3,"text":"피해는 ‘행동 전환 실패’에서 완성된다","textPreview":"피해는 ‘행동 전환 실패’에서 완성된다","textChars":21,"textLines":1,"bbox":[52,76,1170,62]}
+{"kind":"shape","id":"sh/zy50b2ts","slide":3,"bbox":[52,142,1176,2]}
+{"kind":"textbox","id":"sh/edwzihs7","slide":3,"text":"01\n신뢰 획득\n\n기관·가족·금융사\n정교한 사칭","textPreview":"01 | 신뢰 획득 |  | 기관·가족·금융사 | 정교한 사칭","textChars":26,"textLines":5,"bbox":[62,220,190,230]}
+{"kind":"textbox","id":"sh/10nidcbi","slide":3,"text":"02\n심리적 고립\n\n비밀·긴급성·처벌\n통화 유지 압박","textPreview":"02 | 심리적 고립 |  | 비밀·긴급성·처벌 | 통화 유지 압박","textChars":29,"textLines":5,"bbox":[302,220,190,230]}
+{"kind":"textbox","id":"sh/0ze1k7ax","slide":3,"text":"03\n행동 요구\n\n송금·앱 설치·\n인증정보 전달","textPreview":"03 | 행동 요구 |  | 송금·앱 설치· | 인증정보 전달","textChars":26,"textLines":5,"bbox":[542,220,190,230]}
+{"kind":"textbox","id":"sh/jup0n6tw","slide":3,"text":"04\n판단 공백\n\n경고 이유와\n확인 절차 부재","textPreview":"04 | 판단 공백 |  | 경고 이유와 | 확인 절차 부재","textChars":25,"textLines":5,"bbox":[782,220,190,230]}
+{"kind":"textbox","id":"sh/y9gju1sb","slide":3,"text":"05\n피해 인지\n\n이체 후 뒤늦게\n상담·지급정지","textPreview":"05 | 피해 인지 |  | 이체 후 뒤늦게 | 상담·지급정지","textChars":26,"textLines":5,"bbox":[1022,220,190,230]}
+{"kind":"shape","id":"sh/cvmd4jel","slide":3,"bbox":[252,335,50,0]}
+{"kind":"shape","id":"sh/xwvudov6","slide":3,"bbox":[492,335,50,0]}
+{"kind":"shape","id":"sh/at4v29wf","slide":3,"bbox":[732,335,50,0]}
+{"kind":"shape","id":"sh/budcbex0","slide":3,"bbox":[972,335,50,0]}
+{"kind":"textbox","id":"sh/o72d0ze9","slide":3,"text":"개입 지점","textPreview":"개입 지점","textChars":5,"textLines":1,"bbox":[760,177,150,34]}
+{"kind":"textbox","id":"sh/p8bu94fu","slide":3,"text":"AI_Finance_Sec는 ④에서 위험 이유를 설명하고, ⑤ 이전에 공식 재확인 행동을 제안한다.","textPreview":"AI_Finance_Sec는 ④에서 위험 이유를 설명하고, ⑤ 이전에 공식 재확인 행동을 제안한다.","textChars":55,"textLines":1,"bbox":[160,520,960,56]}
+{"kind":"textbox","id":"sh/25kvy9wj","slide":3,"text":"AI_Finance_Sec · 2026.08.16 · 문제정의/시스템설계","textPreview":"AI_Finance_Sec · 2026.08.16 · 문제정의/시스템설계","textChars":40,"textLines":1,"bbox":[52,684,900,18]}
+{"kind":"notes","id":"nt/5uyw64","slide":3,"text":"핵심은 새로운 탐지기를 하나 더 만드는 것이 아니다.\n탐지 신호를 고객의 즉시 행동으로 바꾸는 접점이 서비스의 포지션이다.\n\n[Sources]\n- https://daker.ai/public/hackathons/2026-finance-ai-challenge\n[/Sources]"}
+{"kind":"slide","id":"sl/pbrg31","slide":4,"title":"04","textShapes":16}
+{"kind":"textbox","id":"sh/hsz2xgrq","slide":4,"text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[52,42,48,28]}
+{"kind":"textbox","id":"sh/up8j2lsz","slide":4,"text":"01 · ROOT CAUSE","textPreview":"01 · ROOT CAUSE","textChars":15,"textLines":1,"bbox":[108,42,330,28]}
+{"kind":"textbox","id":"sh/fqhkvq9k","slide":4,"text":"현재 대응은 강하지만, 고객 접점에서는 서로 분리되어 있다","textPreview":"현재 대응은 강하지만, 고객 접점에서는 서로 분리되어 있다","textChars":32,"textLines":1,"bbox":[52,76,1170,62]}
+{"kind":"shape","id":"sh/4val8va1","slide":4,"bbox":[52,142,1176,2]}
+{"kind":"textbox","id":"sh/pgj210rm","slide":4,"text":"통신·단말 탐지","textPreview":"통신·단말 탐지","textChars":8,"textLines":1,"bbox":[66,186,220,66]}
+{"kind":"textbox","id":"sh/2t8j6lsb","slide":4,"text":"통화·문자·앱의 이상 징후","textPreview":"통화·문자·앱의 이상 징후","textChars":14,"textLines":1,"bbox":[310,198,350,44]}
+{"kind":"textbox","id":"sh/3uhkzq9w","slide":4,"text":"금융회사 FDS","textPreview":"금융회사 FDS","textChars":8,"textLines":1,"bbox":[66,282,220,66]}
+{"kind":"textbox","id":"sh/kz61wrax","slide":4,"text":"거래·계좌·단말의 이상 징후","textPreview":"거래·계좌·단말의 이상 징후","textChars":15,"textLines":1,"bbox":[310,294,350,44]}
+{"kind":"textbox","id":"sh/5kf2pwri","slide":4,"text":"예방 교육","textPreview":"예방 교육","textChars":5,"textLines":1,"bbox":[66,378,220,66]}
+{"kind":"textbox","id":"sh/90721sj6","slide":4,"text":"사전에 학습하는 일반 행동수칙","textPreview":"사전에 학습하는 일반 행동수칙","textChars":16,"textLines":1,"bbox":[310,390,350,44]}
+{"kind":"textbox","id":"sh/8zy18nil","slide":4,"text":"기관 신고·조치","textPreview":"기관 신고·조치","textChars":8,"textLines":1,"bbox":[66,474,220,66]}
+{"kind":"textbox","id":"sh/7yp0zi1g","slide":4,"text":"피해 인지 후 상담·지급정지","textPreview":"피해 인지 후 상담·지급정지","textChars":15,"textLines":1,"bbox":[310,486,350,44]}
+{"kind":"textbox","id":"sh/mxgj6d0v","slide":4,"text":"결정의 공백\n\n왜 위험한가?\n지금 무엇을 멈출까?\n어디서 다시 확인할까?","textPreview":"결정의 공백 |  | 왜 위험한가? | 지금 무엇을 멈출까? | 어디서 다시 확인할까?","textChars":40,"textLines":5,"bbox":[760,190,390,350]}
+{"kind":"textbox","id":"sh/h4r25szi","slide":4,"text":"분리된 신호","textPreview":"분리된 신호","textChars":6,"textLines":1,"bbox":[630,314,105,78]}
+{"kind":"shape","id":"sh/g3i1c7ix","slide":4,"bbox":[735,353,25,12]}
+{"kind":"textbox","id":"sh/v2pk32hc","slide":4,"text":"AI_Finance_Sec의 역할","textPreview":"AI_Finance_Sec의 역할","textChars":18,"textLines":1,"bbox":[760,565,390,28]}
+{"kind":"textbox","id":"sh/u1gjax0r","slide":4,"text":"기존 탐지·조치를 대체하지 않고, 설명과 재확인을 잇는 고객 행동 계층","textPreview":"기존 탐지·조치를 대체하지 않고, 설명과 재확인을 잇는 고객 행동 계층","textChars":39,"textLines":1,"bbox":[700,596,510,48]}
+{"kind":"textbox","id":"sh/5sr29cze","slide":4,"text":"AI_Finance_Sec · 2026.08.16 · 문제정의/시스템설계","textPreview":"AI_Finance_Sec · 2026.08.16 · 문제정의/시스템설계","textChars":40,"textLines":1,"bbox":[52,684,900,18]}
+{"kind":"notes","id":"nt/pbrg31","slide":4,"text":"FDS나 통신 탐지의 기능 부족을 주장하지 않는다.\n여러 시스템의 신호가 고객의 행동으로 번역되는 접점 공백을 문제로 정의한다.\n\n[Sources]\n[/Sources]"}
+{"kind":"slide","id":"sl/64zi6m","slide":5,"title":"05","textShapes":10}
+{"kind":"textbox","id":"sh/87m5wryt","slide":5,"text":"05","textPreview":"05","textChars":2,"textLines":1,"bbox":[52,42,48,28]}
+{"kind":"textbox","id":"sh/76d43mx8","slide":5,"text":"02 · SERVICE POSITION","textPreview":"02 · SERVICE POSITION","textChars":21,"textLines":1,"bbox":[108,42,330,28]}
+{"kind":"textbox","id":"sh/m54nuhg3","slide":5,"text":"해결 가설: ‘통합 판단 → 짧은 설명 → 승인된 행동’","textPreview":"해결 가설: ‘통합 판단 → 짧은 설명 → 승인된 행동’","textChars":31,"textLines":1,"bbox":[52,76,1170,62]}
+{"kind":"shape","id":"sh/hwv69wfq","slide":5,"bbox":[52,142,1176,2]}
+{"kind":"textbox","id":"sh/gvm50ry5","slide":5,"text":"SIGNAL\n\n통화·거래 정황","textPreview":"SIGNAL |  | 통화·거래 정황","textChars":16,"textLines":3,"bbox":[70,230,220,190]}
+{"kind":"textbox","id":"sh/vad47mxk","slide":5,"text":"DECISION\n\n보수적 위험판정","textPreview":"DECISION |  | 보수적 위험판정","textChars":18,"textLines":3,"bbox":[370,230,220,190]}
+{"kind":"textbox","id":"sh/u94ny1gz","slide":5,"text":"EXPLANATION\n\n이유·근거 표시","textPreview":"EXPLANATION |  | 이유·근거 표시","textChars":21,"textLines":3,"bbox":[670,230,220,190]}
+{"kind":"textbox","id":"sh/x0bmxcf6","slide":5,"text":"ACTION\n\n중단·확인·신고 안내","textPreview":"ACTION |  | 중단·확인·신고 안내","textChars":19,"textLines":3,"bbox":[970,230,220,190]}
+{"kind":"shape","id":"sh/cf25o7yl","slide":5,"bbox":[290,325,80,0]}
+{"kind":"shape","id":"sh/u18ri1kv","slide":5,"bbox":[590,325,80,0]}
+{"kind":"shape","id":"sh/v2h8r6lg","slide":5,"bbox":[890,325,80,0]}
+{"kind":"textbox","id":"sh/g3q9kb21","slide":5,"text":"검증할 사업 가설","textPreview":"검증할 사업 가설","textChars":9,"textLines":1,"bbox":[80,500,220,28]}
+{"kind":"textbox","id":"sh/h4zatg3m","slide":5,"text":"단순 경고보다 ‘왜 위험한지 + 무엇을 할지’를 함께 제시하면 모의 송금 중단과 공식 재확인 행동이 개선된다.","textPreview":"단순 경고보다 ‘왜 위험한지 + 무엇을 할지’를 함께 제시하면 모의 송금 중단과 공식 재확인 행동이 개선된다.","textChars":61,"textLines":1,"bbox":[80,540,1110,66]}
+{"kind":"textbox","id":"sh/i58rm1k7","slide":5,"text":"AI_Finance_Sec · 2026.08.16 · 문제정의/시스템설계","textPreview":"AI_Finance_Sec · 2026.08.16 · 문제정의/시스템설계","textChars":40,"textLines":1,"bbox":[52,684,900,18]}
+{"kind":"notes","id":"nt/64zi6m","slide":5,"text":"효과를 이미 달성했다고 주장하지 않는다.\n현재 합성 MVP와 향후 POC에서 이 행동 가설을 검증한다.\n\n[Sources]\n[/Sources]"}
+{"kind":"slide","id":"sl/fj2zu4","slide":6,"title":"06","textShapes":16}
+{"kind":"textbox","id":"sh/hor2xcra","slide":6,"text":"06","textPreview":"06","textChars":2,"textLines":1,"bbox":[52,42,48,28]}
+{"kind":"textbox","id":"sh/u10j2xsj","slide":6,"text":"02 · DESIGN PRINCIPLES","textPreview":"02 · DESIGN PRINCIPLES","textChars":22,"textLines":1,"bbox":[108,42,330,28]}
+{"kind":"textbox","id":"sh/fm90v294","slide":6,"text":"설계의 출발점은 ‘정확도’만이 아니라 안전 경계다","textPreview":"설계의 출발점은 ‘정확도’만이 아니라 안전 경계다","textChars":27,"textLines":1,"bbox":[52,76,1170,62]}
+{"kind":"shape","id":"sh/4r218rql","slide":6,"bbox":[52,142,1176,2]}
+{"kind":"textbox","id":"sh/psb21cr6","slide":6,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[70,190,58,30]}
+{"kind":"textbox","id":"sh/2p0j6hsv","slide":6,"text":"보수적 판정\n\n규칙·모델 불일치나 저신뢰는 ‘안전’이 아니라 최소 ‘주의’","textPreview":"보수적 판정 |  | 규칙·모델 불일치나 저신뢰는 ‘안전’이 아니라 최소 ‘주의’","textChars":41,"textLines":3,"bbox":[70,232,260,250]}
+{"kind":"textbox","id":"sh/3qtkzm9g","slide":6,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[370,190,58,30]}
+{"kind":"textbox","id":"sh/cv21crqx","slide":6,"text":"역할 분리\n\n위험판정·근거선택·행동정책·안전검증을 별도 Node로","textPreview":"역할 분리 |  | 위험판정·근거선택·행동정책·안전검증을 별도 Node로","textChars":36,"textLines":3,"bbox":[370,232,260,250]}
+{"kind":"textbox","id":"sh/dwb25wri","slide":6,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[670,190,58,30]}
+{"kind":"textbox","id":"sh/tkv2l0ju","slide":6,"text":"허용 문구\n\n최종 답변은 서버 행동 allowlist로 제한","textPreview":"허용 문구 |  | 최종 답변은 서버 행동 allowlist로 제한","textChars":33,"textLines":3,"bbox":[670,232,260,250]}
+{"kind":"textbox","id":"sh/sjmlsvi9","slide":6,"text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[970,190,58,30]}
+{"kind":"textbox","id":"sh/7idkjq1o","slide":6,"text":"외부조치 경계\n\n신고·지급정지는 안내만 하며 자동 실행하지 않음","textPreview":"외부조치 경계 |  | 신고·지급정지는 안내만 하며 자동 실행하지 않음","textChars":35,"textLines":3,"bbox":[970,232,260,250]}
+{"kind":"textbox","id":"sh/6h43ql03","slide":6,"text":"현재 MVP","textPreview":"현재 MVP","textChars":6,"textLines":1,"bbox":[70,548,220,46]}
+{"kind":"textbox","id":"sh/hof2p0jq","slide":6,"text":"합성 입력 · 로컬 Qwen · 정적 KB · 프로세스 메모리","textPreview":"합성 입력 · 로컬 Qwen · 정적 KB · 프로세스 메모리","textChars":34,"textLines":1,"bbox":[310,552,840,36]}
+{"kind":"textbox","id":"sh/gnmlwvi5","slide":6,"text":"POC / P2","textPreview":"POC / P2","textChars":8,"textLines":1,"bbox":[70,606,220,46]}
+{"kind":"textbox","id":"sh/fmdkna1k","slide":6,"text":"동의 기반 실제 신호 · 금융회사 연계 · 승인 지식 · 영속/감사 체계","textPreview":"동의 기반 실제 신호 · 금융회사 연계 · 승인 지식 · 영속/감사 체계","textChars":40,"textLines":1,"bbox":[310,610,840,36]}
+{"kind":"textbox","id":"sh/ul43u50z","slide":6,"text":"AI_Finance_Sec · 2026.08.16 · 문제정의/시스템설계","textPreview":"AI_Finance_Sec · 2026.08.16 · 문제정의/시스템설계","textChars":40,"textLines":1,"bbox":[52,684,900,18]}
+{"kind":"notes","id":"nt/fj2zu4","slide":6,"text":"현재와 미래 구조를 한 그림에서 혼합하지 않는다.\n현재 MVP에는 실제 개인정보·실시간 거래 스트림이 없다.\n\n[Sources]\n[/Sources]"}
+{"kind":"slide","id":"sl/lwz2wo","slide":7,"title":"07","textShapes":11}
+{"kind":"textbox","id":"sh/r2xg7uxg","slide":7,"text":"07","textPreview":"07","textChars":2,"textLines":1,"bbox":[52,42,48,28]}
+{"kind":"textbox","id":"sh/s36x0ze1","slide":7,"text":"03 · SYSTEM CONTEXT","textPreview":"03 · SYSTEM CONTEXT","textChars":19,"textLines":1,"bbox":[108,42,330,28]}
+{"kind":"textbox","id":"sh/t4fy94f6","slide":7,"text":"현재 MVP는 세 가지 실행 경로를 명확히 분리한다","textPreview":"현재 MVP는 세 가지 실행 경로를 명확히 분리한다","textChars":28,"textLines":1,"bbox":[52,76,1170,62]}
+{"kind":"shape","id":"sh/epoz2pwr","slide":7,"bbox":[52,142,1176,2]}
+{"kind":"textbox","id":"sh/fqxgbuxc","slide":7,"text":"브라우저 UI\nNext.js","textPreview":"브라우저 UI | Next.js","textChars":15,"textLines":2,"bbox":[70,285,190,120]}
+{"kind":"textbox","id":"sh/gr6h4zex","slide":7,"text":"Mock 경로\nTS 규칙·정적 RAG\n네트워크 없음","textPreview":"Mock 경로 | TS 규칙·정적 RAG | 네트워크 없음","textChars":28,"textLines":3,"bbox":[365,165,245,130]}
+{"kind":"textbox","id":"sh/1sfyd4fi","slide":7,"text":"Local Ollama 경로\nNext API → FastAPI\nCompiled LangGraph","textPreview":"Local Ollama 경로 | Next API → FastAPI | Compiled LangGraph","textChars":53,"textLines":3,"bbox":[365,330,245,150]}
+{"kind":"textbox","id":"sh/u9kfq5wn","slide":7,"text":"Cloud BYOK 경로\nProvider API 직접 프록시\nLangGraph 미사용","textPreview":"Cloud BYOK 경로 | Provider API 직접 프록시 | LangGraph 미사용","textChars":47,"textLines":3,"bbox":[365,515,245,125]}
+{"kind":"textbox","id":"sh/vutgzax8","slide":7,"text":"FastAPI :8000\nLangGraph\nQwen2.5:7b × 최대 2회","textPreview":"FastAPI :8000 | LangGraph | Qwen2.5:7b × 최대 2회","textChars":42,"textLines":3,"bbox":[760,322,260,165]}
+{"kind":"textbox","id":"sh/3e1s7q1o","slide":7,"text":"Ollama :11434","textPreview":"Ollama :11434","textChars":13,"textLines":1,"bbox":[1080,360,145,90]}
+{"kind":"shape","id":"sh/itsre5k3","slide":7,"bbox":[260,230,105,115]}
+{"kind":"shape","id":"sh/5gja90ju","slide":7,"bbox":[260,345,105,60]}
+{"kind":"shape","id":"sh/4fa9gvi9","slide":7,"bbox":[260,345,105,232.5]}
+{"kind":"shape","id":"sh/vqh83q1s","slide":7,"bbox":[610,404.5,150,0.5]}
+{"kind":"shape","id":"sh/up8ralk7","slide":7,"bbox":[1020,404.5,60,0.5]}
+{"kind":"textbox","id":"sh/hsja50ji","slide":7,"text":"합성 데이터","textPreview":"합성 데이터","textChars":6,"textLines":1,"bbox":[70,205,140,30]}
+{"kind":"textbox","id":"sh/gra9cv2x","slide":7,"text":"AI_Finance_Sec · 2026.08.16 · 문제정의/시스템설계","textPreview":"AI_Finance_Sec · 2026.08.16 · 문제정의/시스템설계","textChars":40,"textLines":1,"bbox":[52,684,900,18]}
+{"kind":"notes","id":"nt/lwz2wo","slide":7,"text":"Cloud BYOK는 FastAPI/LangGraph와 다른 경로다.\n공개 배포 URL에서 사용자의 localhost Ollama에는 접근할 수 없어 Mock fallback이 발생한다.\n\n[Sources]\n- /Users/dongyoungko/Documents/AI_Hacker/AI_Finance_Sec/app/api/chat/route.ts\n- /Users/dongyoungko/Documents/AI_Hacker/AI_Finance_Sec/backend/main.py\n[/Sources]"}
+{"kind":"slide","id":"sl/btcpa1","slide":8,"title":"08","textShapes":16}
+{"kind":"textbox","id":"sh/zqlcfa5k","slide":8,"text":"08","textPreview":"08","textChars":2,"textLines":1,"bbox":[52,42,48,28]}
+{"kind":"textbox","id":"sh/krut8f65","slide":8,"text":"03 · END-TO-END FLOW","textPreview":"03 · END-TO-END FLOW","textChars":20,"textLines":1,"bbox":[108,42,330,28]}
+{"kind":"textbox","id":"sh/ls3uhkna","slide":8,"text":"전체 플로우: 입력부터 안전 응답까지 하나의 State로 연결","textPreview":"전체 플로우: 입력부터 안전 응답까지 하나의 State로 연결","textChars":34,"textLines":1,"bbox":[52,76,1170,62]}
+{"kind":"shape","id":"sh/mtwbapov","slide":8,"bbox":[52,142,1176,2]}
+{"kind":"textbox","id":"sh/7u5cju5g","slide":8,"text":"사용자 입력\n+ session_id","textPreview":"사용자 입력 | + session_id","textChars":19,"textLines":2,"bbox":[42,190,135,72]}
+{"kind":"textbox","id":"sh/8vetcz61","slide":8,"text":"Next API\n/api/chat","textPreview":"Next API | /api/chat","textChars":18,"textLines":2,"bbox":[199,190,135,72]}
+{"kind":"textbox","id":"sh/9wnulknm","slide":8,"text":"FastAPI\nvalidation","textPreview":"FastAPI | validation","textChars":18,"textLines":2,"bbox":[356,190,135,72]}
+{"kind":"textbox","id":"sh/2xsbylor","slide":8,"text":"prepare_input\n사건 State","textPreview":"prepare_input | 사건 State","textChars":22,"textLines":2,"bbox":[513,190,135,72]}
+{"kind":"textbox","id":"sh/3y1s7q5c","slide":8,"text":"structured\nrisk agent","textPreview":"structured | risk agent","textChars":21,"textLines":2,"bbox":[670,190,135,72]}
+{"kind":"textbox","id":"sh/b25wfqx8","slide":8,"text":"내부 처리\nQwen JSON + fusion","textPreview":"내부 처리 | Qwen JSON + fusion","textChars":24,"textLines":2,"bbox":[827,190,135,72]}
+{"kind":"textbox","id":"sh/q1cfmlw3","slide":8,"text":"finalize\nUI 응답","textPreview":"finalize | UI 응답","textChars":14,"textLines":2,"bbox":[1120,565,115,72]}
+{"kind":"shape","id":"sh/d4nehgfe","slide":8,"bbox":[177,226,22,0]}
+{"kind":"shape","id":"sh/c3exovet","slide":8,"bbox":[334,226,22,0]}
+{"kind":"shape","id":"sh/3ylwb6xc","slide":8,"bbox":[491,226,22,0]}
+{"kind":"shape","id":"sh/2xcfi1wr","slide":8,"bbox":[648,226,22,0]}
+{"kind":"shape","id":"sh/p03edgfi","slide":8,"bbox":[805,226,22,0]}
+{"kind":"textbox","id":"sh/ozuxkbex","slide":8,"text":"knowledge_agent\nTop3 / fallback","textPreview":"knowledge_agent | Top3 / fallback","textChars":31,"textLines":2,"bbox":[660,350,190,90]}
+{"kind":"textbox","id":"sh/fu1w76xg","slide":8,"text":"policy_agent\naction allowlist","textPreview":"policy_agent | action allowlist","textChars":29,"textLines":2,"bbox":[660,480,190,90]}
+{"kind":"textbox","id":"sh/e9sve1gv","slide":8,"text":"ollama_generate\nQwen 자유문 검사\n→ 자유문 폐기","textPreview":"ollama_generate | Qwen 자유문 검사 | → 자유문 폐기","textChars":36,"textLines":3,"bbox":[915,380,190,120]}
+{"kind":"textbox","id":"sh/i5sfq10n","slide":8,"text":"guarded_policy\n+ safety_verifier","textPreview":"guarded_policy | + safety_verifier","textChars":32,"textLines":2,"bbox":[915,540,190,96]}
+{"kind":"shape","id":"sh/j61gz6h8","slide":8,"bbox":[755,262,139.5,88]}
+{"kind":"shape","id":"sh/k7axsrit","slide":8,"bbox":[755,262,139.5,218]}
+{"kind":"shape","id":"sh/5sjylwzy","slide":8,"bbox":[850,395,65,45]}
+{"kind":"shape","id":"sh/6tsfu10j","slide":8,"bbox":[850,440,65,85]}
+{"kind":"shape","id":"sh/7u1gn6h4","slide":8,"bbox":[1010,500,0,40]}
+{"kind":"shape","id":"sh/svuxwbip","slide":8,"bbox":[1105,588,15,13]}
+{"kind":"textbox","id":"sh/tw3ypgza","slide":8,"text":"LangGraph compiled workflow · knowledge와 policy만 병렬","textPreview":"LangGraph compiled workflow · knowledge와 policy만 병렬","textChars":51,"textLines":1,"bbox":[70,615,720,30]}
+{"kind":"textbox","id":"sh/excfyl0v","slide":8,"text":"AI_Finance_Sec · 2026.08.16 · 문제정의/시스템설계","textPreview":"AI_Finance_Sec · 2026.08.16 · 문제정의/시스템설계","textChars":40,"textLines":1,"bbox":[52,684,900,18]}
+{"kind":"notes","id":"nt/btcpa1","slide":8,"text":"실제 Edge: START→prepare_input→structured_risk_agent→(knowledge_agent ∥ policy_agent)→ollama_generate→safety_verifier→finalize→END.\nQwen 자유문은 초기 안전성 측정에만 쓰고 최종 노출 문구에는 사용하지 않는다.\n\n[Sources]\n- /Users/dongyoungko/Documents/AI_Hacker/AI_Finance_Sec/backend/app/graph.py\n[/Sources]"}
+{"kind":"slide","id":"sl/blsc6l","slide":9,"title":"09","textShapes":9}
+{"kind":"textbox","id":"sh/0n69w7yh","slide":9,"text":"09","textPreview":"09","textChars":2,"textLines":1,"bbox":[52,42,48,28]}
+{"kind":"textbox","id":"sh/fmxsn2hw","slide":9,"text":"03 · LANGGRAPH DESIGN","textPreview":"03 · LANGGRAPH DESIGN","textChars":21,"textLines":1,"bbox":[108,42,330,28]}
+{"kind":"textbox","id":"sh/eloruxgb","slide":9,"text":"State·Node·Edge·Compile이 멀티턴 실행을 만든다","textPreview":"State·Node·Edge·Compile이 멀티턴 실행을 만든다","textChars":36,"textLines":1,"bbox":[52,76,1170,62]}
+{"kind":"shape","id":"sh/pszatczy","slide":9,"bbox":[52,142,1176,2]}
+{"kind":"textbox","id":"sh/orqt07yd","slide":9,"text":"ChatState\n\nmessages / user_input\nincident_summary / status\nrule_risk / structured_risk\ndocuments / policy\ndraft / final / safety\ntrace / turn_count","textPreview":"ChatState |  | messages / user_input | incident_summary / status | rule_risk / structured_risk | documents / policy | draft / final / saf...","textChars":147,"textLines":8,"bbox":[65,185,315,390]}
+{"kind":"textbox","id":"sh/nqhsr2hs","slide":9,"text":"Nodes\n\nprepare_input\nstructured_risk_agent\nknowledge_agent ∥ policy_agent\nollama_generate\nsafety_verifier\nfinalize","textPreview":"Nodes |  | prepare_input | structured_risk_agent | knowledge_agent ∥ policy_agent | ollama_generate | safety_verifier | finalize","textChars":114,"textLines":8,"bbox":[455,185,335,300]}
+{"kind":"textbox","id":"sh/2p8byhg7","slide":9,"text":"Compile + Memory\n\nworkflow.compile(\n  checkpointer=InMemorySaver()\n)\n\nthread_id = session_id\n프로세스 종료 시 소멸","textPreview":"Compile + Memory |  | workflow.compile( |   checkpointer=InMemorySaver() | ) |  | thread_id = session_id | 프로세스 종료 시 소멸","textChars":105,"textLines":8,"bbox":[860,185,350,300]}
+{"kind":"shape","id":"sh/xgzaxwza","slide":9,"bbox":[380,335,75,45]}
+{"kind":"shape","id":"sh/cvqt4ryp","slide":9,"bbox":[790,335,70,0]}
+{"kind":"textbox","id":"sh/qt0jq5o3","slide":9,"text":"정정·예문·새 주제 → incident closed/reset","textPreview":"정정·예문·새 주제 → incident closed/reset","textChars":34,"textLines":1,"bbox":[455,520,335,62]}
+{"kind":"textbox","id":"sh/ru90japo","slide":9,"text":"DB 영속화·사용자 계정 연결·암호화는 P2","textPreview":"DB 영속화·사용자 계정 연결·암호화는 P2","textChars":24,"textLines":1,"bbox":[860,520,350,62]}
+{"kind":"textbox","id":"sh/cvi1sf6t","slide":9,"text":"AI_Finance_Sec · 2026.08.16 · 문제정의/시스템설계","textPreview":"AI_Finance_Sec · 2026.08.16 · 문제정의/시스템설계","textChars":40,"textLines":1,"bbox":[52,684,900,18]}
+{"kind":"notes","id":"nt/blsc6l","slide":9,"text":"조건부 Edge나 ToolNode는 없다.\n멀티턴은 session_id 기반 프로세스 내 체크포인트이며 영구 메모리가 아니다.\n\n[Sources]\n- /Users/dongyoungko/Documents/AI_Hacker/AI_Finance_Sec/backend/app/graph.py\n[/Sources]"}
+{"kind":"slide","id":"sl/f4gym2","slide":10,"title":"10","textShapes":9}
+{"kind":"textbox","id":"sh/1sr2to3m","slide":10,"text":"10","textPreview":"10","textChars":2,"textLines":1,"bbox":[52,42,48,28]}
+{"kind":"textbox","id":"sh/epgjit4v","slide":10,"text":"03 · DECISION LOGIC","textPreview":"03 · DECISION LOGIC","textChars":19,"textLines":1,"bbox":[108,42,330,28]}
+{"kind":"textbox","id":"sh/zqpkrylg","slide":10,"text":"위험판정은 규칙과 Qwen 구조화 결과를 보수적으로 결합한다","textPreview":"위험판정은 규칙과 Qwen 구조화 결과를 보수적으로 결합한다","textChars":33,"textLines":1,"bbox":[52,76,1170,62]}
+{"kind":"shape","id":"sh/ofilo3md","slide":10,"bbox":[52,142,1176,2]}
+{"kind":"textbox","id":"sh/9gr2h83y","slide":10,"text":"결정론 규칙\n\nknown-pattern\n완료 행동·정상 맥락\n점수·위험유형","textPreview":"결정론 규칙 |  | known-pattern | 완료 행동·정상 맥락 | 점수·위험유형","textChars":41,"textLines":5,"bbox":[75,210,260,220]}
+{"kind":"textbox","id":"sh/md03mt47","slide":10,"text":"Qwen JSON\n\nstate / risk_type\naction / destination\nconfidence / evidence","textPreview":"Qwen JSON |  | state / risk_type | action / destination | confidence / evidence","textChars":71,"textLines":5,"bbox":[75,460,260,180]}
+{"kind":"textbox","id":"sh/ne9kfyls","slide":10,"text":"Conservative Fusion\n\n피해완료 → 위험 75+\nfraud & conf≥.75 → 위험 70+\n저신뢰·불일치 → 최소 주의 40+","textPreview":"Conservative Fusion |  | 피해완료 → 위험 75+ | fraud & conf≥.75 → 위험 70+ | 저신뢰·불일치 → 최소 주의 40+","textChars":80,"textLines":5,"bbox":[500,285,350,260]}
+{"kind":"textbox","id":"sh/4je1cjmt","slide":10,"text":"최종 Risk State\n\nscore · level · verdict\nrisk_type · evidence\nalready_transferred","textPreview":"최종 Risk State |  | score · level · verdict | risk_type · evidence | already_transferred","textChars":79,"textLines":5,"bbox":[965,310,250,210]}
+{"kind":"shape","id":"sh/pk72l4ne","slide":10,"bbox":[335,320,165,95]}
+{"kind":"shape","id":"sh/lovax0b2","slide":10,"bbox":[335,415,165,135]}
+{"kind":"shape","id":"sh/knm9ovux","slide":10,"bbox":[850,415,115,0]}
+{"kind":"textbox","id":"sh/j2d8vqtc","slide":10,"text":"Qwen 실패/JSON 오류 → rule_fallback","textPreview":"Qwen 실패/JSON 오류 → rule_fallback","textChars":31,"textLines":1,"bbox":[470,584,410,44]}
+{"kind":"textbox","id":"sh/y14rm5cr","slide":10,"text":"AI_Finance_Sec · 2026.08.16 · 문제정의/시스템설계","textPreview":"AI_Finance_Sec · 2026.08.16 · 문제정의/시스템설계","textChars":40,"textLines":1,"bbox":[52,684,900,18]}
+{"kind":"notes","id":"nt/f4gym2","slide":10,"text":"Qwen은 자유문이 아니라 엄격한 JSON 스키마로 위험판정에 기여한다.\n이 구조는 오분류를 제거하지 않는다. 불확실성을 안전 판정으로 내리는 위험을 줄이는 설계다.\n\n[Sources]\n- /Users/dongyoungko/Documents/AI_Hacker/AI_Finance_Sec/backend/app/graph.py\n[/Sources]"}
+{"kind":"slide","id":"sl/xh1mfu","slide":11,"title":"11","textShapes":16}
+{"kind":"textbox","id":"sh/nyxwbu10","slide":11,"text":"11","textPreview":"11","textChars":2,"textLines":1,"bbox":[52,42,48,28]}
+{"kind":"textbox","id":"sh/oz6xkzil","slide":11,"text":"03 · RAG & SAFETY","textPreview":"03 · RAG & SAFETY","textChars":17,"textLines":1,"bbox":[108,42,330,28]}
+{"kind":"textbox","id":"sh/90fed4j6","slide":11,"text":"근거 선택과 최종 행동문을 분리해 생성 위험을 제한한다","textPreview":"근거 선택과 최종 행동문을 분리해 생성 위험을 제한한다","textChars":30,"textLines":1,"bbox":[52,76,1170,62]}
+{"kind":"shape","id":"sh/et4fep0j","slide":11,"bbox":[52,142,1176,2]}
+{"kind":"textbox","id":"sh/zudw7u14","slide":11,"text":"근거 선택","textPreview":"근거 선택","textChars":5,"textLines":1,"bbox":[70,180,200,30]}
+{"kind":"textbox","id":"sh/0vmxgzip","slide":11,"text":"query + risk_type","textPreview":"query + risk_type","textChars":17,"textLines":1,"bbox":[70,230,190,70]}
+{"kind":"textbox","id":"sh/1wve9kja","slide":11,"text":"정적 요약 KB 11건\n위험유형 필터","textPreview":"정적 요약 KB 11건 | 위험유형 필터","textChars":20,"textLines":2,"bbox":[320,230,210,70]}
+{"kind":"textbox","id":"sh/yp8fq90n","slide":11,"text":"lexical/bigram\n+ RRF 유사 결합","textPreview":"lexical/bigram | + RRF 유사 결합","textChars":26,"textLines":2,"bbox":[590,230,210,70]}
+{"kind":"textbox","id":"sh/jqhgje18","slide":11,"text":"Top3\n또는 policy_fallback","textPreview":"Top3 | 또는 policy_fallback","textChars":23,"textLines":2,"bbox":[860,230,220,70]}
+{"kind":"shape","id":"sh/7ip47el0","slide":11,"bbox":[260,265,60,0]}
+{"kind":"shape","id":"sh/6hw3y94f","slide":11,"bbox":[530,265,60,0]}
+{"kind":"shape","id":"sh/t47m943q","slide":11,"bbox":[800,265,60,0]}
+{"kind":"textbox","id":"sh/s3yl0jml","slide":11,"text":"최종 응답","textPreview":"최종 응답","textChars":5,"textLines":1,"bbox":[70,365,200,30]}
+{"kind":"textbox","id":"sh/f6p4belw","slide":11,"text":"서버 policy\naction allowlist","textPreview":"서버 policy | action allowlist","textChars":26,"textLines":2,"bbox":[70,415,220,88]}
+{"kind":"textbox","id":"sh/u5g3294b","slide":11,"text":"guarded_policy_answer\n허용 문구만 구성","textPreview":"guarded_policy_answer | 허용 문구만 구성","textChars":31,"textLines":2,"bbox":[380,415,260,88]}
+{"kind":"textbox","id":"sh/h87mdo32","slide":11,"text":"Safety checks\n위험행동·허위완료 금지","textPreview":"Safety checks | 위험행동·허위완료 금지","textChars":26,"textLines":2,"bbox":[730,415,260,88]}
+{"kind":"textbox","id":"sh/g7yl4jmh","slide":11,"text":"사용자 안내\n중단·확인·신고","textPreview":"사용자 안내 | 중단·확인·신고","textChars":15,"textLines":2,"bbox":[1070,415,150,88]}
+{"kind":"shape","id":"sh/3a94fyl8","slide":11,"bbox":[290,459,90,0]}
+{"kind":"shape","id":"sh/29036t4n","slide":11,"bbox":[640,459,90,0]}
+{"kind":"shape","id":"sh/yh4fuhs7","slide":11,"bbox":[990,459,80,0]}
+{"kind":"textbox","id":"sh/zidgnm9c","slide":11,"text":"외부 조치 실행 = FALSE","textPreview":"외부 조치 실행 = FALSE","textChars":16,"textLines":1,"bbox":[805,552,270,44]}
+{"kind":"textbox","id":"sh/kjmxwrax","slide":11,"text":"피해 발생 시: 1394 신고·상담 + 긴급 시 112 + 해당 금융회사 연락·지급정지 요청","textPreview":"피해 발생 시: 1394 신고·상담 + 긴급 시 112 + 해당 금융회사 연락·지급정지 요청","textChars":51,"textLines":1,"bbox":[145,610,980,38]}
+{"kind":"textbox","id":"sh/l4vypwri","slide":11,"text":"AI_Finance_Sec · 2026.08.16 · 문제정의/시스템설계","textPreview":"AI_Finance_Sec · 2026.08.16 · 문제정의/시스템설계","textChars":40,"textLines":1,"bbox":[52,684,900,18]}
+{"kind":"notes","id":"nt/xh1mfu","slide":11,"text":"현재 검색은 벡터 임베딩이나 cross-encoder가 아니다.\nKB는 공식기관 안내를 요약한 데모 지식이며 기관 승인 지식저장소가 아니다.\n\n[Sources]\n- /Users/dongyoungko/Documents/AI_Hacker/AI_Finance_Sec/backend/app/graph.py\n- https://www.police.go.kr/user/bbs/BD_selectBbs.do?q_bbsCode=1007&q_bbscttSn=20260209152732394\n[/Sources]"}
+{"kind":"slide","id":"sl/bdwg76","slide":12,"title":"12","textShapes":9}
+{"kind":"textbox","id":"sh/5kbm98fu","slide":12,"text":"12","textPreview":"12","textChars":2,"textLines":1,"bbox":[52,42,48,28]}
+{"kind":"textbox","id":"sh/ixk3ytgj","slide":12,"text":"04 · ROAD TO POC","textPreview":"04 · ROAD TO POC","textChars":16,"textLines":1,"bbox":[108,42,330,28]}
+{"kind":"textbox","id":"sh/jyt47yxo","slide":12,"text":"현재는 ‘안전한 합성 MVP’, 다음은 ‘기관 승인형 POC’","textPreview":"현재는 ‘안전한 합성 MVP’, 다음은 ‘기관 승인형 POC’","textChars":34,"textLines":1,"bbox":[52,76,1170,62]}
+{"kind":"shape","id":"sh/sn2l4nyl","slide":12,"bbox":[52,142,1176,2]}
+{"kind":"textbox","id":"sh/tovmd8f6","slide":12,"text":"CURRENT MVP","textPreview":"CURRENT MVP","textChars":11,"textLines":1,"bbox":[76,180,330,34]}
+{"kind":"textbox","id":"sh/6lk32dgf","slide":12,"text":"구현됨\n\n• 합성 통화 문장·합성 거래 신호 UI\n• Mock + Local FastAPI/LangGraph\n• 규칙 + Qwen 구조화 JSON fusion\n• 정적 KB 11건 + 경량 재순위\n• allowlist 응답 + Safety\n• session 기반 휘발성 멀티턴\n• 합성 회귀·holdout 테스트","textPreview":"구현됨 |  | • 합성 통화 문장·합성 거래 신호 UI | • Mock + Local FastAPI/LangGraph | • 규칙 + Qwen 구조화 JSON fusion | • 정적 KB 11건 + 경량 재순위 | • allowlist 응답 ...","textChars":174,"textLines":9,"bbox":[70,225,500,360]}
+{"kind":"textbox","id":"sh/rmt4bix0","slide":12,"text":"POC / P2","textPreview":"POC / P2","textChars":8,"textLines":1,"bbox":[720,180,330,34]}
+{"kind":"textbox","id":"sh/8rilsjy1","slide":12,"text":"미구현·기관 합의 필요\n\n• 동의 기반 통화 위험 특징값 / STT\n• 실제 거래·FDS·은행 레거시 연계\n• 승인 지식·버전·검수 워크플로\n• Vector DB·embedding·reranker\n• RAGAS·실데이터 calibration·drift\n• 영속 DB·인증·권한·감사로그\n• Human review·이의제기 운영","textPreview":"미구현·기관 합의 필요 |  | • 동의 기반 통화 위험 특징값 / STT | • 실제 거래·FDS·은행 레거시 연계 | • 승인 지식·버전·검수 워크플로 | • Vector DB·embedding·reranker | • RAGAS·실데이터 ca...","textChars":182,"textLines":9,"bbox":[710,225,500,360]}
+{"kind":"shape","id":"sh/9srm1ofm","slide":12,"bbox":[590,350,100,80]}
+{"kind":"textbox","id":"sh/5o3aho36","slide":12,"text":"POC의 성공 기준은 실사용 정확도 주장보다 ‘행동 개선·안전 위반 0·운영 가능성’을 검증하는 것이다.","textPreview":"POC의 성공 기준은 실사용 정확도 주장보다 ‘행동 개선·안전 위반 0·운영 가능성’을 검증하는 것이다.","textChars":58,"textLines":1,"bbox":[140,620,1000,44]}
+{"kind":"textbox","id":"sh/4nut8jml","slide":12,"text":"AI_Finance_Sec · 2026.08.16 · 문제정의/시스템설계","textPreview":"AI_Finance_Sec · 2026.08.16 · 문제정의/시스템설계","textChars":40,"textLines":1,"bbox":[52,684,900,18]}
+{"kind":"notes","id":"nt/bdwg76","slide":12,"text":"합성 회귀셋 통과는 구현 안정성 증거일 뿐 실사용 일반화 성능이 아니다.\n다음 단계는 실제 통화 원문 수집보다 최소 위험 특징값 기반 POC 입력 경로를 우선 검토한다.\n\n[Sources]\n- /Users/dongyoungko/Documents/AI_Hacker/AI_Finance_Sec/backend/app/graph.py\n- /Users/dongyoungko/Documents/AI_Hacker/AI_Finance_Sec/app/lib/engine.ts\n[/Sources]"}

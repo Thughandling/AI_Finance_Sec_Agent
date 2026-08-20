@@ -1,0 +1,62 @@
+# ---------------------------------------------------------------------------
+# AI_Finance_Sec_Agent — 저장소 루트 ignore
+# 앱 전용 규칙은 AI_Finance_Sec/.gitignore 에 따로 있다.
+# ---------------------------------------------------------------------------
+
+# 비밀정보 (절대 커밋 금지)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*_rsa
+*_rsa.pub
+secrets.json
+
+# 의존성 / 가상환경
+node_modules/
+.pnpm-store/
+**/.venv/
+__pycache__/
+*.py[cod]
+
+# 빌드 · 캐시 산출물
+dist/
+build/
+.next/
+.vinext/
+.wrangler/
+.turbo/
+.vite/
+.pytest_cache/
+*.tsbuildinfo
+
+# 로컬 데모 런타임 (Windows)
+.demo-logs/
+tools/
+
+# 중간 생성물 — 스크립트로 재생성 가능한 렌더 이미지·임시 변환물
+# (원본 빌드 스크립트는 아래 예외로 유지한다)
+tmp/*
+!tmp/*/
+tmp/*/*
+!tmp/**/*.mjs
+!tmp/**/*.py
+!tmp/**/*.json
+tmp/**/*.png
+tmp/**/*.webp
+tmp/**/*.bmp
+tmp/**/*.layout.json
+
+# OS · 에디터
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.swp
+
+# 임시 파일
+*.log
+*.tmp
+~$*
