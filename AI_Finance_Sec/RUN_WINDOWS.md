@@ -24,9 +24,11 @@ Cloudflare Quick Tunnel로 외부 접근 가능한 공개 URL을 발급하는 �
               ┌────────────────────────┐          │ (+ 사용자 API 키)
               │ FastAPI :8000          │          ▼
               │ 실제 LangGraph         │   각 Provider 공식 API
+              │  transaction_signal    │
               │  risk ∥ knowledge ∥ policy
               │  → ollama_generate     │
               │  → safety_verifier     │
+              │  → alert_planner       │
               └──────────┬─────────────┘
                          ▼
               ┌────────────────────────┐

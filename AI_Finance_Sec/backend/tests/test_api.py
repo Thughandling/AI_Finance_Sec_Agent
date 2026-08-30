@@ -209,7 +209,7 @@ def test_langgraph_ollama_success_and_multiturn(monkeypatch) -> None:
     assert payload["external_action_executed"] is False
     assert {"structured_risk_agent_failed", "rule_risk_fallback", "knowledge_agent", "policy_agent"}.issubset(payload["trace"])
     assert "policy_guardrail" in payload["trace"]
-    assert payload["trace"][-2:] == ["safety_verifier", "finalize"]
+    assert payload["trace"][-3:] == ["safety_verifier", "alert_planner", "finalize"]
     second_payload = second.json()
     assert second_payload["turn_count"] == 2
     assert second_payload["risk"]["verdict"] == "사기"
@@ -455,3 +455,85 @@ def test_negated_or_stopped_dangerous_actions_are_safe() -> None:
 def test_rejects_blank_message_and_invalid_session_id() -> None:
     assert client.post("/api/chat", json={"message": "   ", "session_id": "valid-session"}).status_code == 422
     assert client.post("/api/chat", json={"message": "테스트", "session_id": "invalid session/../../"}).status_code == 422
+
+
+def test_transaction_anomaly_scores_only_when_context_is_present():
+    assert graph.detect_transaction_anomaly(None) == {
+        "score": 0, "raw_score": 0, "signals": [], "observed": [], "in_call": False, "evaluated": False,
+    }
+    quiet = graph.detect_transaction_anomaly({"amount": 150_000, "payee": "KB-1002-3355", "hour": 14})
+    assert quiet["raw_score"] == 0 and quiet["evaluated"] is True
+
+    loud = graph.detect_transaction_anomaly({
+        "amount": 9_800_000, "payee": "WOORI-777-0001", "hour": 23,
+        "in_call": True, "new_device_or_app": True, "limit_raised": True,
+    })
+    assert [signal["key"] for signal in loud["signals"]] == [
+        "amount_far_over_p95", "first_time_payee", "odd_hour", "in_call_transfer", "new_device_or_app", "limit_raised",
+    ]
+    assert loud["raw_score"] == 58
+    assert loud["score"] == graph.TRANSACTION_RISK_CAP == 30
+
+
+def test_transaction_signal_raises_score_and_level_but_never_flips_verdict():
+    rule = graph.analyze_risk("고객님이 요청한 대출 상담 예약을 확인하겠습니다.")
+    anomaly = graph.detect_transaction_anomaly({"amount": 2_000_000, "payee": "X-1", "hour": 3, "recent_transfer_count": 3})
+    fused = graph.fuse_risk(rule, _structured(), anomaly)
+    assert fused["verdict"] == rule["verdict"] == "정상"
+    assert fused["score"] == min(100, rule["score"] + anomaly["score"])
+    assert fused["transaction_score"] == anomaly["score"]
+    assert fused["fusion"].endswith("+transaction")
+
+    # 거래 컨텍스트가 없으면 기존 판정이 한 글자도 바뀌지 않는다.
+    untouched = graph.fuse_risk(rule, _structured(), graph.detect_transaction_anomaly(None))
+    assert untouched["score"] == rule["score"]
+    assert untouched["fusion"] == "rule+structured"
+
+
+def test_alert_tier_scales_with_risk_and_stays_quiet_for_normal_customers():
+    quiet = graph.plan_alert({"score": 12, "risk_type": "정상 절차", "evidence": []}, graph.detect_transaction_anomaly(None))
+    assert quiet["tier"] == 0 and quiet["channels"] == [] and quiet["hold_seconds"] == 0
+
+    background_only = graph.plan_alert(
+        {"score": 0, "risk_type": "정상 절차", "evidence": []},
+        graph.detect_transaction_anomaly({"amount": 2_000_000, "payee": "X-1", "hour": 3, "recent_transfer_count": 3}),
+    )
+    assert background_only["tier"] == 2
+    assert background_only["hold_seconds"] == 15
+    assert background_only["self_check"][0].startswith("지금 누군가 통화로")
+
+
+def test_alert_suppresses_push_during_a_call_and_uses_an_out_of_band_channel():
+    in_call = graph.detect_transaction_anomaly({"amount": 9_800_000, "payee": "NEW-1", "hour": 23, "in_call": True})
+    off_call = graph.detect_transaction_anomaly({"amount": 9_800_000, "payee": "NEW-1", "hour": 23})
+    risk = {"score": 94, "risk_type": "금전 요구", "evidence": [{"type": "금전 요구", "keywords": ["즉시 이체 요구"], "score_added": 30}]}
+
+    during = graph.plan_alert(risk, in_call)
+    assert during["suppressed_channels"] == ["푸시 알림", "SMS"]
+    assert not any(channel in during["channels"] for channel in ("푸시 알림", "SMS"))
+    assert "ARS 콜백" in during["channels"]
+    assert during["covert_mode"] is True
+    assert during["notify_trusted_contact"] is True
+
+    without = graph.plan_alert(risk, off_call)
+    assert "푸시 알림" in without["channels"] and without["covert_mode"] is False
+
+
+def test_alert_never_leaves_the_policy_allowlist_or_claims_an_executed_action():
+    anomaly = graph.detect_transaction_anomaly({"amount": 9_800_000, "payee": "NEW-1", "hour": 23, "in_call": True})
+    for score in (0, 45, 68, 94):
+        for risk_type in ("정상 절차", "기관 사칭", "피해 발생"):
+            plan = graph.plan_alert({"score": score, "risk_type": risk_type, "evidence": []}, anomaly)
+            assert plan["message"]["primary_action"] in graph.POLICY_ACTION_ALLOWLIST
+            assert plan["external_action_executed"] is False
+
+    victim = graph.plan_alert({"score": 80, "risk_type": "피해 발생", "already_transferred": True, "evidence": []}, anomaly)
+    assert victim["tier"] == 3
+    assert victim["message"]["primary_action"] == "해당 금융회사 콜센터에 지급정지 요청"
+    assert victim["golden_time"]["window_minutes"] == 30
+    assert all(step in graph.POLICY_ACTION_ALLOWLIST for step in victim["golden_time"]["sequence"])
+
+
+def test_graph_exposes_the_transaction_and_alert_nodes():
+    nodes = set(graph.chat_graph.get_graph().nodes)
+    assert {"transaction_signal_agent", "alert_planner"} <= nodes

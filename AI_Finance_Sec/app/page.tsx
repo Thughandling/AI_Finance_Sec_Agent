@@ -5,11 +5,15 @@ import {
   analyzeText,
   buildMockAnswer,
   calculateEvaluation,
+  detectTransactionAnomaly,
+  emptyAnomaly,
   pipelineSteps,
+  planAlert,
   providers,
   retrieveAndRerank,
   scenarios,
   verifyAnswer,
+  type AlertPlan,
   type DetectionResult,
   type ProviderId,
 } from "./lib/engine";
@@ -42,6 +46,18 @@ type LocalGraphResponse = {
     risk_type: string;
     evidence: Array<{ type: string; keywords: string[]; score_added: number }>;
     already_transferred: boolean;
+  };
+  alert?: {
+    tier: number;
+    tier_name: string;
+    channels: string[];
+    suppressed_channels: string[];
+    suppression_reason: string;
+    hold_seconds: number;
+    self_check: string[];
+    covert_mode: boolean;
+    notify_trusted_contact: boolean;
+    message: { observed: string[]; reason: string; primary_action: string };
   };
   documents?: Array<{
     id: string;
@@ -92,8 +108,8 @@ export default function Home() {
   const provider = providers.find((item) => item.id === providerId) ?? providers[0];
   const evaluation = useMemo(() => calculateEvaluation(), []);
   const transcript = lineIndex >= 0 ? scenario.lines.slice(0, lineIndex + 1).map((line) => line.text).join(" ") : "";
-  const transactionRisk = lineIndex >= 2 ? scenario.transactionSignals.reduce((sum, item) => sum + item.risk, 0) : 0;
-  const baseDetection = analyzeText(transcript, transactionRisk);
+  const anomaly = lineIndex >= 2 ? detectTransactionAnomaly(scenario.transactionContext) : emptyAnomaly;
+  const baseDetection = analyzeText(transcript, anomaly.score);
   const curatedScore = lineIndex >= 0 ? scenario.lines[lineIndex]?.score ?? 0 : 0;
   const score = Math.max(baseDetection.score, curatedScore);
   const level: DetectionResult["level"] = score >= 70 ? "위험" : score >= 40 ? "주의" : "안전";
@@ -101,6 +117,26 @@ export default function Home() {
   const retrieved = retrieveAndRerank(transcript || scenario.description, detection.riskType);
   const isOllamaActual = providerId === "ollama";
   const actualTrace = isOllamaActual ? lastGraphRun?.trace ?? [] : [];
+  const localAlert = planAlert(detection, anomaly);
+  const displayedAlert: AlertPlan = isOllamaActual && lastGraphRun?.alert
+    ? {
+        ...localAlert,
+        tier: lastGraphRun.alert.tier,
+        tierName: lastGraphRun.alert.tier_name,
+        channels: lastGraphRun.alert.channels,
+        suppressedChannels: lastGraphRun.alert.suppressed_channels,
+        suppressionReason: lastGraphRun.alert.suppression_reason,
+        holdSeconds: lastGraphRun.alert.hold_seconds,
+        selfCheck: lastGraphRun.alert.self_check,
+        covertMode: lastGraphRun.alert.covert_mode,
+        notifyTrustedContact: lastGraphRun.alert.notify_trusted_contact,
+        message: {
+          observed: lastGraphRun.alert.message.observed,
+          reason: lastGraphRun.alert.message.reason,
+          primaryAction: lastGraphRun.alert.message.primary_action,
+        },
+      }
+    : localAlert;
   const finalVerification = messages.filter((message) => message.role === "assistant").at(-1);
   const hasChatTurn = messages.some((message) => message.role === "user");
   const verification = isOllamaActual
@@ -209,6 +245,15 @@ export default function Home() {
           message: value,
           history: messages.slice(-6).map((message) => ({ role: message.role, content: message.text })),
           context: JSON.stringify({ detection: currentDetection, documents }, null, 2),
+          transaction: {
+            amount: scenario.transactionContext.amount,
+            payee: scenario.transactionContext.payee,
+            hour: scenario.transactionContext.hour,
+            in_call: Boolean(scenario.transactionContext.inCall),
+            new_device_or_app: Boolean(scenario.transactionContext.newDeviceOrApp),
+            limit_raised: Boolean(scenario.transactionContext.limitRaised),
+            recent_transfer_count: scenario.transactionContext.recentTransferCount ?? 0,
+          },
         }),
       });
       const data = await response.json() as LocalGraphResponse;
@@ -349,10 +394,30 @@ export default function Home() {
               {lastGraphRun?.safety ? Object.entries(lastGraphRun.safety.checks).map(([name, passed]) => <span key={name} className={passed ? "passed" : "failed"}>{passed ? "✓" : "!"} {name}</span>) : <span>FastAPI 검증 결과 대기</span>}
             </div>
           </> : <>
-            <div className="section-title"><h3>거래 결합 신호</h3><span>{lineIndex >= 2 ? "활성" : "대기"}</span></div>
+            <div className="section-title"><h3>백그라운드 이상거래 신호</h3><span>{anomaly.evaluated ? `합계 ${anomaly.rawScore} · 반영 ${anomaly.score}` : "대기"}</span></div>
             <div className="signal-list">
-              {scenario.transactionSignals.map((signal) => <div className="signal-item" key={signal.label}><span>{signal.label}<small>{signal.value}</small></span><b className={lineIndex >= 2 && signal.risk > 0 ? "risk" : ""}>+{lineIndex >= 2 ? signal.risk : 0}</b></div>)}
+              {anomaly.signals.length > 0
+                ? anomaly.signals.map((signal) => <div className="signal-item" key={signal.key}><span>{signal.label}<small>{signal.value}</small></span><b className="risk">+{signal.weight}</b></div>)
+                : <div className="signal-item"><span>평소 거래 프로필과 차이 없음<small>금액·수취인·시간대·기기 모두 정상 범위</small></span><b>+0</b></div>}
             </div>
+          </>}
+
+          <div className="section-title"><h3>경보 전달 계획</h3><span>T{displayedAlert.tier} · {displayedAlert.tierName}</span></div>
+          <div className="signal-list">
+            <div className="signal-item"><span>전달 채널<small>{displayedAlert.channels.length > 0 ? displayedAlert.channels.join(" · ") : "개입하지 않음"}</small></span><b className={displayedAlert.tier >= 2 ? "risk" : ""}>T{displayedAlert.tier}</b></div>
+            {displayedAlert.suppressedChannels.length > 0 && <div className="signal-item"><span>억제 채널<small>{displayedAlert.suppressionReason}</small></span><b className="risk">{displayedAlert.suppressedChannels.join(" · ")}</b></div>}
+            <div className="signal-item"><span>강제 체류<small>{displayedAlert.covertMode ? "은밀 모드 · 화면 전환 없음" : "표준 화면"}</small></span><b className={displayedAlert.holdSeconds > 0 ? "risk" : ""}>{displayedAlert.holdSeconds}초</b></div>
+            {displayedAlert.notifyTrustedContact && <div className="signal-item"><span>신뢰인 알림<small>사전 등록 1인에게 확인 요청</small></span><b className="risk">발송</b></div>}
+          </div>
+
+          {displayedAlert.tier >= 1 && <>
+            <div className="section-title"><h3>고객에게 보이는 문구</h3><span>관측 · 이유 · 행동</span></div>
+            <div className="alert-message" data-testid="alert-message">
+              <p><i>1</i><span>{displayedAlert.message.observed.length > 0 ? displayedAlert.message.observed.join(" / ") : "거래 이상 신호 없음"}</span></p>
+              <p><i>2</i><span>{displayedAlert.message.reason}</span></p>
+              <p><i>3</i><strong>{displayedAlert.message.primaryAction}</strong></p>
+            </div>
+            {displayedAlert.selfCheck.length > 0 && <div className="safety-detail">{displayedAlert.selfCheck.map((question) => <span key={question}>? {question}</span>)}</div>}
           </>}
 
           <div className="section-title"><h3>서버가 선택한 검색 근거</h3><span>RRF Top 3</span></div>

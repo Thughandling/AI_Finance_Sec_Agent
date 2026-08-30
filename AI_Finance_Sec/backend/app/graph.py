@@ -183,6 +183,9 @@ class ChatState(TypedDict, total=False):
     structured_error: str | None
     incident_summary: str
     incident_status: str
+    transaction: dict[str, Any]
+    transaction_anomaly: dict[str, Any]
+    alert: dict[str, Any]
 
 
 def analyze_risk(text: str) -> dict[str, Any]:
@@ -293,6 +296,158 @@ POLICY_ACTION_ALLOWLIST = (
 )
 
 
+# --- 백그라운드 이상거래 탐지 -------------------------------------------------
+# 통화 맥락과 독립적으로, 평소 거래 프로필과 이번 이체를 대조해 이상 신호를 만든다.
+# engine.ts의 detectTransactionAnomaly와 score-for-score 동일해야 한다.
+
+TRANSACTION_BASELINE: dict[str, Any] = {
+    "median_amount": 120_000,
+    "p95_amount": 500_000,
+    "known_payees": ("KB-1002-3355", "SHINHAN-110-4477", "NH-352-9910"),
+    "usual_hour_start": 8,
+    "usual_hour_end": 22,
+}
+
+TRANSACTION_RISK_CAP = 30
+
+
+def _won(value: int) -> str:
+    return f"{int(value):,}원"
+
+
+def detect_transaction_anomaly(
+    context: dict[str, Any] | None,
+    baseline: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """평소 프로필 대비 이번 이체의 이상 신호를 만든다. 컨텍스트가 없으면 무점수."""
+    if not context:
+        return {"score": 0, "raw_score": 0, "signals": [], "observed": [], "in_call": False, "evaluated": False}
+    profile = {**TRANSACTION_BASELINE, **(baseline or {})}
+    amount = max(0, int(context.get("amount", 0)))
+    payee = str(context.get("payee", "")).strip()
+    hour = int(context.get("hour", 12))
+    recent_transfers = int(context.get("recent_transfer_count", 0))
+    signals: list[dict[str, Any]] = []
+
+    def add(key: str, weight: int, label: str, value: str) -> None:
+        signals.append({"key": key, "weight": weight, "label": label, "value": value})
+
+    p95 = int(profile["p95_amount"])
+    if amount > p95 * 2:
+        add("amount_far_over_p95", 12, "평소 상위 5% 이체액의 2배 초과", f"{_won(amount)} · 평소 {_won(p95)}")
+    elif amount > p95:
+        add("amount_over_p95", 8, "평소 상위 5% 이체액 초과", f"{_won(amount)} · 평소 {_won(p95)}")
+    if payee and payee not in tuple(profile["known_payees"]):
+        add("first_time_payee", 10, "처음 보내는 수취인 계좌", payee)
+    if not (int(profile["usual_hour_start"]) <= hour < int(profile["usual_hour_end"])):
+        add("odd_hour", 6, "평소 이체하지 않는 시간대", f"{hour:02d}시")
+    if context.get("in_call"):
+        add("in_call_transfer", 12, "통화 중 이체 시도", "통화 연결 상태")
+    if context.get("new_device_or_app"):
+        add("new_device_or_app", 10, "신규 기기·앱 설치 직후 이체", "설치 24시간 이내")
+    if recent_transfers >= 2:
+        add("split_transfer", 8, "짧은 시간 내 분할 이체 반복", f"최근 1시간 {recent_transfers}건")
+    if context.get("limit_raised"):
+        add("limit_raised", 8, "이체 한도 상향 직후", "24시간 이내 상향")
+
+    raw = sum(signal["weight"] for signal in signals)
+    return {
+        "score": min(raw, TRANSACTION_RISK_CAP),
+        "raw_score": raw,
+        "signals": signals,
+        "observed": [f"{signal['label']} — {signal['value']}" for signal in signals],
+        "in_call": bool(context.get("in_call")),
+        "evaluated": True,
+    }
+
+
+# --- 경보 전달 계획 -----------------------------------------------------------
+# 균일 팝업은 학습적으로 무시되고, 통화 중 푸시는 범인에게 화면을 노출시킨다.
+# 위험도에 비례한 마찰과 채널만 사용하고, 통화 중에는 푸시·SMS를 억제한다.
+
+ALERT_TIER_NAMES = ("무개입", "인라인 배너", "인터스티셜", "다채널 경보")
+ALERT_HOLD_SECONDS = (0, 0, 15, 30)
+
+ALERT_SELF_CHECK = (
+    "지금 누군가 통화로 이 이체를 안내하고 있나요?",
+    "상대가 알려준 번호가 아닌 공식 대표번호로 확인했나요?",
+    "이 계좌로 이전에 이체한 적이 있나요?",
+)
+
+GOLDEN_TIME_SEQUENCE = (
+    "해당 금융회사 콜센터에 지급정지 요청",
+    "1394 신고·상담",
+    "긴급 시 112 신고",
+    "통화·문자·계좌 증거 보관",
+)
+
+
+def _text_tier(score: int) -> int:
+    return 3 if score >= 75 else 2 if score >= 60 else 1 if score >= 40 else 0
+
+
+def _transaction_tier(raw_score: int) -> int:
+    return 2 if raw_score >= 30 else 1 if raw_score >= 18 else 0
+
+
+def plan_alert(risk: dict[str, Any], anomaly: dict[str, Any] | None = None) -> dict[str, Any]:
+    anomaly = anomaly or {}
+    text_tier = _text_tier(int(risk.get("score", 0)))
+    transaction_tier = _transaction_tier(int(anomaly.get("raw_score", 0)))
+    tier = max(text_tier, transaction_tier)
+    if text_tier >= 1 and transaction_tier >= 1:
+        tier = min(3, tier + 1)
+    if risk.get("already_transferred"):
+        tier = 3
+
+    in_call = bool(anomaly.get("in_call"))
+    channels: list[str] = []
+    suppressed: list[str] = []
+    if tier >= 1:
+        channels.append("인앱 인라인 배너" if tier == 1 else "인앱 인터스티셜")
+    if tier >= 2:
+        (suppressed if in_call else channels).append("푸시 알림")
+    if tier >= 3:
+        channels.append("ARS 콜백")
+        (suppressed if in_call else channels).append("SMS")
+
+    primary_action = (
+        "해당 금융회사 콜센터에 지급정지 요청" if risk.get("already_transferred")
+        else "통화 즉시 종료" if tier >= 3
+        else "공식 대표번호·앱에서 사실 확인"
+    )
+    if primary_action not in POLICY_ACTION_ALLOWLIST:
+        primary_action = "공식 대표번호·앱에서 사실 확인"
+
+    evidence = risk.get("evidence") or []
+    reason_keyword = (evidence[0].get("keywords") or ["평소와 다른 거래 패턴"])[0] if evidence else "평소와 다른 거래 패턴"
+
+    return {
+        "tier": tier,
+        "tier_name": ALERT_TIER_NAMES[tier],
+        "text_tier": text_tier,
+        "transaction_tier": transaction_tier,
+        "channels": channels,
+        "suppressed_channels": suppressed,
+        "suppression_reason": "통화 중에는 상대방이 화면을 함께 볼 수 있어 푸시·SMS를 억제한다." if suppressed else "",
+        "hold_seconds": ALERT_HOLD_SECONDS[tier],
+        "self_check": list(ALERT_SELF_CHECK) if tier >= 2 else [],
+        "escalation_rule": "첫 문항에 '예'로 답하면 즉시 최고 단계로 승급한다." if tier >= 2 else "",
+        "covert_mode": in_call and tier >= 2,
+        "notify_trusted_contact": tier >= 3,
+        "golden_time": (
+            {"window_minutes": 30, "sequence": list(GOLDEN_TIME_SEQUENCE)}
+            if risk.get("already_transferred") else None
+        ),
+        "message": {
+            "observed": list(anomaly.get("observed", []))[:3],
+            "reason": f"[{risk.get('risk_type', '정상 절차')}] {reason_keyword}",
+            "primary_action": primary_action,
+        },
+        "external_action_executed": False,
+    }
+
+
 def guarded_policy_answer(risk: dict[str, Any], policy: dict[str, Any], documents: list[dict[str, Any]]) -> str:
     allowed_actions = [action for action in policy.get("actions", []) if action in POLICY_ACTION_ALLOWLIST]
     if not allowed_actions:
@@ -375,7 +530,11 @@ def parse_structured_risk(raw: str) -> dict[str, Any]:
     return {**value, "confidence": confidence}
 
 
-def fuse_risk(rule: dict[str, Any], structured: dict[str, Any]) -> dict[str, Any]:
+def fuse_risk(
+    rule: dict[str, Any],
+    structured: dict[str, Any],
+    transaction: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     fused = {**rule, "fusion": "rule+structured"}
     state, confidence = structured["state"], structured["confidence"]
     victim = state == "victim" or (structured["completed_action"] and structured["external_actor"])
@@ -387,6 +546,18 @@ def fuse_risk(rule: dict[str, Any], structured: dict[str, Any]) -> dict[str, Any
         fused.update(score=max(rule["score"], 40), level="주의", verdict="사기")
         if fused["risk_type"] == "정상 절차":
             fused["risk_type"] = structured["risk_type"] or "복합 의심"
+    return _apply_transaction_signal(fused, transaction)
+
+
+def _apply_transaction_signal(fused: dict[str, Any], transaction: dict[str, Any] | None) -> dict[str, Any]:
+    """거래 이상신호는 점수·등급만 올린다. verdict는 통화 맥락 판정을 그대로 둔다."""
+    contribution = int((transaction or {}).get("score", 0))
+    fused["transaction_score"] = contribution
+    if contribution <= 0:
+        return fused
+    fused["score"] = min(100, fused["score"] + contribution)
+    fused["level"] = "위험" if fused["score"] >= 70 else "주의" if fused["score"] >= 40 else "안전"
+    fused["fusion"] = f"{fused['fusion']}+transaction"
     return fused
 
 
@@ -411,13 +582,19 @@ def prepare_input(state: ChatState) -> dict[str, Any]:
     }
 
 
+def transaction_signal_agent(state: ChatState) -> dict[str, Any]:
+    """백그라운드 이상거래 탐지. 통화 입력과 무관하게 거래 프로필만 본다."""
+    return {"transaction_anomaly": detect_transaction_anomaly(state.get("transaction")), "trace": ["transaction_signal_agent"]}
+
+
 async def structured_risk_agent(state: ChatState) -> dict[str, Any]:
     rule = analyze_risk(state["analysis_input"])
+    anomaly = state.get("transaction_anomaly", {})
     try:
         structured = parse_structured_risk(await call_ollama_structured(state["analysis_input"]))
-        return {"rule_risk": rule, "structured_risk": structured, "risk": fuse_risk(rule, structured), "structured_fallback": False, "structured_error": None, "trace": ["structured_risk_agent", "conservative_fusion"]}
+        return {"rule_risk": rule, "structured_risk": structured, "risk": fuse_risk(rule, structured, anomaly), "structured_fallback": False, "structured_error": None, "trace": ["structured_risk_agent", "conservative_fusion"]}
     except Exception as exc:
-        return {"rule_risk": rule, "structured_risk": {}, "risk": {**rule, "fusion": "rule_fallback"}, "structured_fallback": True, "structured_error": f"{type(exc).__name__}: {str(exc)[:180]}", "trace": ["structured_risk_agent_failed", "rule_risk_fallback"]}
+        return {"rule_risk": rule, "structured_risk": {}, "risk": _apply_transaction_signal({**rule, "fusion": "rule_fallback"}, anomaly), "structured_fallback": True, "structured_error": f"{type(exc).__name__}: {str(exc)[:180]}", "trace": ["structured_risk_agent_failed", "rule_risk_fallback"]}
 
 
 def knowledge_agent(state: ChatState) -> dict[str, Any]:
@@ -539,6 +716,10 @@ def safety_verifier(state: ChatState) -> dict[str, Any]:
     }
 
 
+def alert_planner(state: ChatState) -> dict[str, Any]:
+    return {"alert": plan_alert(state["risk"], state.get("transaction_anomaly", {})), "trace": ["alert_planner"]}
+
+
 def finalize(state: ChatState) -> dict[str, Any]:
     return {
         "messages": [AIMessage(content=state["final_answer"])],
@@ -549,19 +730,23 @@ def finalize(state: ChatState) -> dict[str, Any]:
 
 workflow = StateGraph(ChatState)
 workflow.add_node("prepare_input", prepare_input)
+workflow.add_node("transaction_signal_agent", transaction_signal_agent)
 workflow.add_node("structured_risk_agent", structured_risk_agent)
 workflow.add_node("knowledge_agent", knowledge_agent)
 workflow.add_node("policy_agent", policy_agent)
 workflow.add_node("ollama_generate", generate_answer)
 workflow.add_node("safety_verifier", safety_verifier)
+workflow.add_node("alert_planner", alert_planner)
 workflow.add_node("finalize", finalize)
 workflow.add_edge(START, "prepare_input")
-workflow.add_edge("prepare_input", "structured_risk_agent")
+workflow.add_edge("prepare_input", "transaction_signal_agent")
+workflow.add_edge("transaction_signal_agent", "structured_risk_agent")
 workflow.add_edge("structured_risk_agent", "knowledge_agent")
 workflow.add_edge("structured_risk_agent", "policy_agent")
 workflow.add_edge(["knowledge_agent", "policy_agent"], "ollama_generate")
 workflow.add_edge("ollama_generate", "safety_verifier")
-workflow.add_edge("safety_verifier", "finalize")
+workflow.add_edge("safety_verifier", "alert_planner")
+workflow.add_edge("alert_planner", "finalize")
 workflow.add_edge("finalize", END)
 
 # Demo-only volatile memory: all sessions disappear when this process exits.
@@ -569,9 +754,9 @@ memory = InMemorySaver()
 chat_graph = workflow.compile(checkpointer=memory)
 
 
-async def run_chat(message: str, session_id: str) -> dict[str, Any]:
+async def run_chat(message: str, session_id: str, transaction: dict[str, Any] | None = None) -> dict[str, Any]:
     result = await chat_graph.ainvoke(
-        {"messages": [HumanMessage(content=message)], "user_input": message},
+        {"messages": [HumanMessage(content=message)], "user_input": message, "transaction": transaction or {}},
         config={"configurable": {"thread_id": session_id}, "recursion_limit": 16},
     )
     full_trace = result.get("trace", [])
@@ -592,6 +777,8 @@ async def run_chat(message: str, session_id: str) -> dict[str, Any]:
         "structured_fallback": bool(result.get("structured_fallback")),
         "structured_error": result.get("structured_error"),
         "incident_status": result.get("incident_status", "active"),
+        "transaction_anomaly": result.get("transaction_anomaly", {}),
+        "alert": result.get("alert", {}),
         "fallback_reason": (
             "ollama_call_failure"
             if result.get("generation_error")

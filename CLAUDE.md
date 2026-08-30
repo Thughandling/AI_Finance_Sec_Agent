@@ -8,7 +8,7 @@
 | 경로 | 내용 |
 |---|---|
 | `AI_Finance_Sec/app/` | Next 프론트. `lib/engine.ts` = TS 탐지엔진, `api/chat` = 프록시 |
-| `AI_Finance_Sec/backend/app/graph.py` | FastAPI + LangGraph 실제 추론 경로 (risk ∥ knowledge ∥ policy → generate → safety) |
+| `AI_Finance_Sec/backend/app/graph.py` | FastAPI + LangGraph 실제 추론 경로 (transaction_signal → risk ∥ knowledge ∥ policy → generate → safety → alert_planner) |
 | `AI_Finance_Sec/tests/` | `engine.test.mjs`, `rendered-html.test.mjs` |
 | `AI_Finance_Sec/backend/tests/` | `test_api.py` |
 | `submission/` `docs/` `presentation/` | 제출본·설계문서·장표 |
@@ -27,6 +27,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\start-demo.ps1   # Ollama + F
 
 - **엔진 동등성**: `graph.py`와 `engine.ts`는 score-for-score 동일해야 한다. 수정 순서는 `graph.py` → `engine.ts` → 테스트 → 평가 JSON.
 - **Safety**: 모델 자유문 노출 금지, 금지 행동 권고 금지, 피해대응 필수행동 누락 금지, 조치 완료를 사실처럼 말하지 말 것.
+- **경보**: 통화 중에는 푸시·SMS를 억제한다(범인에게 화면이 노출된다). 고객 문구의 단일 CTA는 정책 허용목록 안에서만 고른다. 거래 이상신호는 `verdict`를 바꾸지 않는다.
 - **BYOK 키**: React state와 서버 프록시 1회 요청에만 존재. DB·파일 저장 금지, 응답에 `Cache-Control: no-store`.
 
 ## 토큰 절약 (중요)

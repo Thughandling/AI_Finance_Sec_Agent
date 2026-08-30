@@ -16,6 +16,17 @@ export type TransactionSignal = {
   risk: number;
 };
 
+/** 백그라운드 이상거래 탐지 입력. 모두 합성 데이터다. */
+export type TransactionContext = {
+  amount: number;
+  payee: string;
+  hour: number;
+  inCall?: boolean;
+  newDeviceOrApp?: boolean;
+  limitRaised?: boolean;
+  recentTransferCount?: number;
+};
+
 export type Scenario = {
   id: string;
   tag: string;
@@ -24,6 +35,7 @@ export type Scenario = {
   expectedLabel: ExpectedLabel;
   lines: ScenarioLine[];
   transactionSignals: TransactionSignal[];
+  transactionContext: TransactionContext;
 };
 
 export type KnowledgeDocument = {
@@ -82,6 +94,7 @@ export const scenarios: Scenario[] = [
       { label: "이체 금액", value: "평소 대비 8.4배", risk: 24 },
       { label: "통화 결합", value: "의심 통화 직후", risk: 28 },
     ],
+    transactionContext: { amount: 9_800_000, payee: "WOORI-777-0001", hour: 21, inCall: true, limitRaised: true },
   },
   {
     id: "loan",
@@ -100,6 +113,7 @@ export const scenarios: Scenario[] = [
       { label: "거래 속도", value: "10분 내 3회", risk: 18 },
       { label: "거래 메모", value: "대출 수수료", risk: 22 },
     ],
+    transactionContext: { amount: 1_200_000, payee: "KAKAO-3333-77", hour: 15, inCall: true, recentTransferCount: 3 },
   },
   {
     id: "family",
@@ -118,6 +132,7 @@ export const scenarios: Scenario[] = [
       { label: "인출 금액", value: "평소 대비 14.2배", risk: 26 },
       { label: "행동 결합", value: "통화 중 ATM 이동", risk: 30 },
     ],
+    transactionContext: { amount: 20_000_000, payee: "ATM-CASH-0002", hour: 20, inCall: true, recentTransferCount: 2 },
   },
   {
     id: "normal",
@@ -136,6 +151,7 @@ export const scenarios: Scenario[] = [
       { label: "금액", value: "평소 범위", risk: 0 },
       { label: "기기", value: "기존 기기", risk: 0 },
     ],
+    transactionContext: { amount: 150_000, payee: "KB-1002-3355", hour: 14 },
   },
 ];
 
@@ -428,4 +444,172 @@ export function calculateEvaluation() {
   return { total: rows.length, tp, tn, fp, fn, precision, recall, f1, macroF1: (f1 + normalF1) / 2, rows };
 }
 
-export const pipelineSteps = ["입력 검증", "State", "병렬 탐지", "RAG 검색", "RRF 리랭킹", "Qwen 분석", "정책 보호·Safety"];
+/* --- 백그라운드 이상거래 탐지 ------------------------------------------------
+ * 통화 맥락과 독립적으로, 평소 거래 프로필과 이번 이체를 대조해 이상 신호를 만든다.
+ * backend/app/graph.py의 detect_transaction_anomaly와 score-for-score 동일해야 한다.
+ */
+
+export const transactionBaseline = {
+  medianAmount: 120_000,
+  p95Amount: 500_000,
+  knownPayees: ["KB-1002-3355", "SHINHAN-110-4477", "NH-352-9910"],
+  usualHourStart: 8,
+  usualHourEnd: 22,
+};
+
+export const TRANSACTION_RISK_CAP = 30;
+
+export type AnomalySignal = { key: string; weight: number; label: string; value: string };
+
+export type TransactionAnomaly = {
+  score: number;
+  rawScore: number;
+  signals: AnomalySignal[];
+  observed: string[];
+  inCall: boolean;
+  evaluated: boolean;
+};
+
+const won = (value: number) => `${Math.trunc(value).toLocaleString("en-US")}원`;
+
+export const emptyAnomaly: TransactionAnomaly = { score: 0, rawScore: 0, signals: [], observed: [], inCall: false, evaluated: false };
+
+export function detectTransactionAnomaly(context?: TransactionContext | null): TransactionAnomaly {
+  if (!context) return emptyAnomaly;
+  const amount = Math.max(0, Math.trunc(context.amount ?? 0));
+  const payee = (context.payee ?? "").trim();
+  const hour = context.hour ?? 12;
+  const recentTransfers = context.recentTransferCount ?? 0;
+  const p95 = transactionBaseline.p95Amount;
+  const signals: AnomalySignal[] = [];
+  const add = (key: string, weight: number, label: string, value: string) => signals.push({ key, weight, label, value });
+
+  if (amount > p95 * 2) add("amount_far_over_p95", 12, "평소 상위 5% 이체액의 2배 초과", `${won(amount)} · 평소 ${won(p95)}`);
+  else if (amount > p95) add("amount_over_p95", 8, "평소 상위 5% 이체액 초과", `${won(amount)} · 평소 ${won(p95)}`);
+  if (payee && !transactionBaseline.knownPayees.includes(payee)) add("first_time_payee", 10, "처음 보내는 수취인 계좌", payee);
+  if (hour < transactionBaseline.usualHourStart || hour >= transactionBaseline.usualHourEnd) {
+    add("odd_hour", 6, "평소 이체하지 않는 시간대", `${String(hour).padStart(2, "0")}시`);
+  }
+  if (context.inCall) add("in_call_transfer", 12, "통화 중 이체 시도", "통화 연결 상태");
+  if (context.newDeviceOrApp) add("new_device_or_app", 10, "신규 기기·앱 설치 직후 이체", "설치 24시간 이내");
+  if (recentTransfers >= 2) add("split_transfer", 8, "짧은 시간 내 분할 이체 반복", `최근 1시간 ${recentTransfers}건`);
+  if (context.limitRaised) add("limit_raised", 8, "이체 한도 상향 직후", "24시간 이내 상향");
+
+  const rawScore = signals.reduce((sum, signal) => sum + signal.weight, 0);
+  return {
+    score: Math.min(rawScore, TRANSACTION_RISK_CAP),
+    rawScore,
+    signals,
+    observed: signals.map((signal) => `${signal.label} — ${signal.value}`),
+    inCall: Boolean(context.inCall),
+    evaluated: true,
+  };
+}
+
+/* --- 경보 전달 계획 ----------------------------------------------------------
+ * 균일 팝업은 학습적으로 무시되고, 통화 중 푸시는 범인에게 화면을 노출시킨다.
+ * 위험도에 비례한 마찰과 채널만 사용하고, 통화 중에는 푸시·SMS를 억제한다.
+ */
+
+export const alertTierNames = ["무개입", "인라인 배너", "인터스티셜", "다채널 경보"] as const;
+const alertHoldSeconds = [0, 0, 15, 30];
+
+export const alertSelfCheck = [
+  "지금 누군가 통화로 이 이체를 안내하고 있나요?",
+  "상대가 알려준 번호가 아닌 공식 대표번호로 확인했나요?",
+  "이 계좌로 이전에 이체한 적이 있나요?",
+];
+
+export const goldenTimeSequence = [
+  "해당 금융회사 콜센터에 지급정지 요청",
+  "1394 신고·상담",
+  "긴급 시 112 신고",
+  "통화·문자·계좌 증거 보관",
+];
+
+export const policyActionAllowlist = [
+  "통화 즉시 종료",
+  "추가 송금·앱 설치 중단",
+  "통화·문자·계좌 증거 보관",
+  "공식 대표번호·앱에서 사실 확인",
+  "1394 신고·상담",
+  "긴급 시 112 신고",
+  "해당 금융회사 콜센터에 지급정지 요청",
+  "새로운 송금·앱 설치 요구 시 중단",
+  "불필요한 개인정보 제공 금지",
+];
+
+export type AlertPlan = {
+  tier: number;
+  tierName: string;
+  textTier: number;
+  transactionTier: number;
+  channels: string[];
+  suppressedChannels: string[];
+  suppressionReason: string;
+  holdSeconds: number;
+  selfCheck: string[];
+  escalationRule: string;
+  covertMode: boolean;
+  notifyTrustedContact: boolean;
+  goldenTime: { windowMinutes: number; sequence: string[] } | null;
+  message: { observed: string[]; reason: string; primaryAction: string };
+  externalActionExecuted: false;
+};
+
+const textTierOf = (score: number) => (score >= 75 ? 3 : score >= 60 ? 2 : score >= 40 ? 1 : 0);
+const transactionTierOf = (rawScore: number) => (rawScore >= 30 ? 2 : rawScore >= 18 ? 1 : 0);
+
+export function planAlert(result: DetectionResult, anomaly: TransactionAnomaly = emptyAnomaly): AlertPlan {
+  // engine.ts의 DetectionResult에는 alreadyTransferred가 없다. riskType이 "피해 발생"인
+  // 경우와 동치이므로 graph.py의 already_transferred 자리에 그대로 대응시킨다.
+  const alreadyTransferred = result.riskType === "피해 발생";
+  const textTier = textTierOf(result.score);
+  const transactionTier = transactionTierOf(anomaly.rawScore);
+  let tier = Math.max(textTier, transactionTier);
+  if (textTier >= 1 && transactionTier >= 1) tier = Math.min(3, tier + 1);
+  if (alreadyTransferred) tier = 3;
+
+  const inCall = anomaly.inCall;
+  const channels: string[] = [];
+  const suppressedChannels: string[] = [];
+  if (tier >= 1) channels.push(tier === 1 ? "인앱 인라인 배너" : "인앱 인터스티셜");
+  if (tier >= 2) (inCall ? suppressedChannels : channels).push("푸시 알림");
+  if (tier >= 3) {
+    channels.push("ARS 콜백");
+    (inCall ? suppressedChannels : channels).push("SMS");
+  }
+
+  let primaryAction = alreadyTransferred
+    ? "해당 금융회사 콜센터에 지급정지 요청"
+    : tier >= 3
+      ? "통화 즉시 종료"
+      : "공식 대표번호·앱에서 사실 확인";
+  if (!policyActionAllowlist.includes(primaryAction)) primaryAction = "공식 대표번호·앱에서 사실 확인";
+
+  const reasonKeyword = (result.evidence[0] ?? "").split(": ").slice(1).join(": ") || "평소와 다른 거래 패턴";
+
+  return {
+    tier,
+    tierName: alertTierNames[tier],
+    textTier,
+    transactionTier,
+    channels,
+    suppressedChannels,
+    suppressionReason: suppressedChannels.length ? "통화 중에는 상대방이 화면을 함께 볼 수 있어 푸시·SMS를 억제한다." : "",
+    holdSeconds: alertHoldSeconds[tier],
+    selfCheck: tier >= 2 ? [...alertSelfCheck] : [],
+    escalationRule: tier >= 2 ? "첫 문항에 '예'로 답하면 즉시 최고 단계로 승급한다." : "",
+    covertMode: inCall && tier >= 2,
+    notifyTrustedContact: tier >= 3,
+    goldenTime: alreadyTransferred ? { windowMinutes: 30, sequence: [...goldenTimeSequence] } : null,
+    message: {
+      observed: anomaly.observed.slice(0, 3),
+      reason: `[${result.riskType}] ${reasonKeyword}`,
+      primaryAction,
+    },
+    externalActionExecuted: false,
+  };
+}
+
+export const pipelineSteps = ["입력 검증", "State", "이상거래 탐지", "병렬 탐지", "RAG 검색", "RRF 리랭킹", "Qwen 분석", "정책 보호·Safety", "경보 전달 계획"];

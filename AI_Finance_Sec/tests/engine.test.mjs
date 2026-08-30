@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { readFile, rm, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import ts from "typescript";
@@ -93,7 +93,7 @@ print(json.dumps([scope["analyze_risk"](case["text"]) for case in dataset["cases
     pythonProgram,
     fileURLToPath(new URL("../backend/app/graph.py", import.meta.url)),
     fileURLToPath(new URL("../public/data/evaluation_cases.json", import.meta.url)),
-  ], { encoding: "utf8" }));
+  ], { encoding: "utf8", env: { ...process.env, PYTHONIOENCODING: "utf-8" } }));
 
   dataset.cases.forEach((item, index) => {
     const tsResult = analyzeText(item.text);
@@ -250,4 +250,199 @@ test("does not expose a verified raw LLM response mode in product code", async (
   ]);
   assert.doesNotMatch(`${page}\n${graph}\n${readme}`, /llm_verified/);
   assert.match(page, /Qwen 로컬 호출 확인 \+ 서버 정책 엔진 응답/);
+});
+
+const ALERT_CONTEXTS = [
+  null,
+  { amount: 150000, payee: "KB-1002-3355", hour: 14 },
+  { amount: 600000, payee: "KB-1002-3355", hour: 10 },
+  { amount: 9800000, payee: "WOORI-777-0001", hour: 23, in_call: true, new_device_or_app: true, limit_raised: true },
+  { amount: 1200000, payee: "KAKAO-3333-77", hour: 15, in_call: true, recent_transfer_count: 3 },
+  { amount: 2000000, payee: "X-1", hour: 3, recent_transfer_count: 3 },
+];
+
+const ALERT_RISKS = [
+  { score: 0, riskType: "정상 절차", keyword: "" },
+  { score: 45, riskType: "기관 사칭", keyword: "수사·감독기관 사칭 맥락" },
+  { score: 68, riskType: "대출 미끼", keyword: "정부지원 대출 미끼" },
+  { score: 94, riskType: "금전 요구", keyword: "즉시 이체 요구" },
+  { score: 80, riskType: "피해 발생", keyword: "송금·이체 완료 표현" },
+];
+
+function toCamelContext(context) {
+  if (!context) return null;
+  return {
+    amount: context.amount,
+    payee: context.payee,
+    hour: context.hour,
+    inCall: context.in_call ?? false,
+    newDeviceOrApp: context.new_device_or_app ?? false,
+    limitRaised: context.limit_raised ?? false,
+    recentTransferCount: context.recent_transfer_count ?? 0,
+  };
+}
+
+function toDetectionResult(risk) {
+  return {
+    score: risk.score,
+    level: risk.score >= 70 ? "위험" : risk.score >= 40 ? "주의" : "안전",
+    verdict: risk.score >= 40 ? "사기" : "정상",
+    riskType: risk.riskType,
+    evidence: risk.keyword ? [`${risk.riskType}: ${risk.keyword}`] : [],
+    actions: [],
+  };
+}
+
+test("background transaction detector and alert planner stay equivalent across engines", async () => {
+  const { detectTransactionAnomaly, planAlert } = await engine();
+  const pythonProgram = String.raw`
+import ast, json, re, sys
+from typing import Any
+graph_path, payload_path = sys.argv[1:]
+tree = ast.parse(open(graph_path, encoding="utf-8").read())
+wanted_names = {
+    "TRANSACTION_BASELINE", "TRANSACTION_RISK_CAP", "ALERT_TIER_NAMES", "ALERT_HOLD_SECONDS",
+    "ALERT_SELF_CHECK", "GOLDEN_TIME_SEQUENCE", "POLICY_ACTION_ALLOWLIST",
+}
+wanted_functions = {"_won", "detect_transaction_anomaly", "_text_tier", "_transaction_tier", "plan_alert"}
+nodes = []
+for node in tree.body:
+    if isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id in wanted_names for t in node.targets):
+        nodes.append(node)
+    elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.target.id in wanted_names:
+        nodes.append(node)
+    elif isinstance(node, ast.FunctionDef) and node.name in wanted_functions:
+        nodes.append(node)
+module = ast.Module(body=nodes, type_ignores=[])
+scope = {"re": re, "Any": Any}
+exec(compile(ast.fix_missing_locations(module), graph_path, "exec"), scope)
+payload = json.load(open(payload_path, encoding="utf-8"))
+out = []
+for context in payload["contexts"]:
+    anomaly = scope["detect_transaction_anomaly"](context)
+    for item in payload["risks"]:
+        risk = {
+            "score": item["score"],
+            "risk_type": item["riskType"],
+            "evidence": [{"type": item["riskType"], "keywords": [item["keyword"]], "score_added": 0}] if item["keyword"] else [],
+            "already_transferred": item["riskType"] == "피해 발생",
+        }
+        out.append({"anomaly": anomaly, "alert": scope["plan_alert"](risk, anomaly)})
+print(json.dumps(out, ensure_ascii=False))
+`;
+  const payloadPath = fileURLToPath(new URL("../.alert-parity-payload.json", import.meta.url));
+  await writeFile(payloadPath, JSON.stringify({ contexts: ALERT_CONTEXTS, risks: ALERT_RISKS }), "utf8");
+  let pythonResults;
+  try {
+    pythonResults = JSON.parse(execFileSync(pythonBin(), [
+      "-c",
+      pythonProgram,
+      fileURLToPath(new URL("../backend/app/graph.py", import.meta.url)),
+      payloadPath,
+    ], { encoding: "utf8", env: { ...process.env, PYTHONIOENCODING: "utf-8" } }));
+  } finally {
+    await rm(payloadPath, { force: true });
+  }
+
+  let index = 0;
+  for (const context of ALERT_CONTEXTS) {
+    const anomaly = detectTransactionAnomaly(toCamelContext(context));
+    for (const item of ALERT_RISKS) {
+      const label = `${JSON.stringify(context)} / ${item.riskType} ${item.score}`;
+      const expected = pythonResults[index];
+      index += 1;
+      assert.deepEqual(
+        { score: anomaly.score, rawScore: anomaly.rawScore, observed: anomaly.observed },
+        { score: expected.anomaly.score, rawScore: expected.anomaly.raw_score, observed: expected.anomaly.observed },
+        label,
+      );
+      const alert = planAlert(toDetectionResult(item), anomaly);
+      assert.deepEqual(
+        {
+          tier: alert.tier,
+          tierName: alert.tierName,
+          channels: alert.channels,
+          suppressed: alert.suppressedChannels,
+          hold: alert.holdSeconds,
+          covert: alert.covertMode,
+          trusted: alert.notifyTrustedContact,
+          selfCheck: alert.selfCheck,
+          message: alert.message,
+        },
+        {
+          tier: expected.alert.tier,
+          tierName: expected.alert.tier_name,
+          channels: expected.alert.channels,
+          suppressed: expected.alert.suppressed_channels,
+          hold: expected.alert.hold_seconds,
+          covert: expected.alert.covert_mode,
+          trusted: expected.alert.notify_trusted_contact,
+          selfCheck: expected.alert.self_check,
+          message: {
+            observed: expected.alert.message.observed,
+            reason: expected.alert.message.reason,
+            primaryAction: expected.alert.message.primary_action,
+          },
+        },
+        label,
+      );
+    }
+  }
+  assert.equal(index, ALERT_CONTEXTS.length * ALERT_RISKS.length);
+});
+
+test("alert delivery never pushes during a call and never claims an executed external action", async () => {
+  const { detectTransactionAnomaly, planAlert, policyActionAllowlist } = await engine();
+  const inCall = detectTransactionAnomaly({ amount: 9800000, payee: "NEW-1", hour: 23, inCall: true, limitRaised: true });
+  const offCall = detectTransactionAnomaly({ amount: 9800000, payee: "NEW-1", hour: 23, limitRaised: true });
+  const fraud = { score: 94, level: "위험", verdict: "사기", riskType: "금전 요구", evidence: ["금전 요구: 즉시 이체 요구"], actions: [] };
+
+  const duringCall = planAlert(fraud, inCall);
+  assert.equal(duringCall.channels.some((channel) => /푸시|SMS/.test(channel)), false);
+  assert.deepEqual(duringCall.suppressedChannels, ["푸시 알림", "SMS"]);
+  assert.equal(duringCall.covertMode, true);
+  assert.ok(duringCall.channels.includes("ARS 콜백"));
+
+  const withoutCall = planAlert(fraud, offCall);
+  assert.ok(withoutCall.channels.includes("푸시 알림"));
+  assert.equal(withoutCall.covertMode, false);
+
+  // 단일 CTA는 정책 허용목록 안에서만 나온다.
+  for (const anomaly of [inCall, offCall]) {
+    for (const score of [0, 45, 68, 94]) {
+      const plan = planAlert({ ...fraud, score }, anomaly);
+      assert.ok(policyActionAllowlist.includes(plan.message.primaryAction), `${score}: ${plan.message.primaryAction}`);
+      assert.equal(plan.externalActionExecuted, false);
+    }
+  }
+
+  // 조용한 고객에게는 개입하지 않는다.
+  const quiet = planAlert({ ...fraud, score: 12, level: "안전", verdict: "정상", riskType: "정상 절차" }, detectTransactionAnomaly(null));
+  assert.equal(quiet.tier, 0);
+  assert.deepEqual(quiet.channels, []);
+  assert.equal(quiet.holdSeconds, 0);
+
+  // 송금 후에는 골든타임 순서를 제시한다.
+  const victim = planAlert({ ...fraud, riskType: "피해 발생" }, offCall);
+  assert.equal(victim.tier, 3);
+  assert.equal(victim.message.primaryAction, "해당 금융회사 콜센터에 지급정지 요청");
+  assert.equal(victim.goldenTime?.windowMinutes, 30);
+  for (const step of victim.goldenTime?.sequence ?? []) assert.ok(policyActionAllowlist.includes(step), step);
+});
+
+test("scenario transaction contexts keep the fused score unchanged", async () => {
+  const { scenarios, detectTransactionAnomaly } = await engine();
+  const expected = { prosecutor: 30, loan: 30, family: 30, normal: 0 };
+  for (const scenario of scenarios) {
+    assert.equal(detectTransactionAnomaly(scenario.transactionContext).score, expected[scenario.id], scenario.id);
+  }
+});
+
+test("renders the background alert panel instead of the static signal table", async () => {
+  const page = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+  assert.match(page, /백그라운드 이상거래 신호/);
+  assert.match(page, /경보 전달 계획/);
+  assert.match(page, /data-testid="alert-message"/);
+  assert.match(page, /detectTransactionAnomaly\(scenario\.transactionContext\)/);
+  assert.doesNotMatch(page, /scenario\.transactionSignals\.reduce/);
 });

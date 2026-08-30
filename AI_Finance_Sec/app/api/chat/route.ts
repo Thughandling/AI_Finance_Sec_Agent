@@ -10,6 +10,15 @@ type ChatRequest = {
   context?: string;
   history?: Array<{ role: "user" | "assistant"; content: string }>;
   sessionId?: string;
+  transaction?: {
+    amount?: number;
+    payee?: string;
+    hour?: number;
+    in_call?: boolean;
+    new_device_or_app?: boolean;
+    limit_raised?: boolean;
+    recent_transfer_count?: number;
+  };
 };
 
 const defaults: Record<Provider, string> = {
@@ -33,7 +42,11 @@ async function callLocalLangGraph(body: ChatRequest) {
   const response = await fetch(`${baseUrl}/api/chat`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ message: String(body.message ?? "").slice(0, 2000), session_id: body.sessionId }),
+    body: JSON.stringify({
+      message: String(body.message ?? "").slice(0, 2000),
+      session_id: body.sessionId,
+      transaction: body.transaction,
+    }),
     signal: AbortSignal.timeout(LOCAL_TIMEOUT_MS),
   });
   const data = await response.json() as Record<string, unknown> & { error?: string; detail?: string };
