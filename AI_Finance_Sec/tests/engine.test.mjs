@@ -445,4 +445,9 @@ test("renders the background alert panel instead of the static signal table", as
   assert.match(page, /data-testid="alert-message"/);
   assert.match(page, /detectTransactionAnomaly\(scenario\.transactionContext\)/);
   assert.doesNotMatch(page, /scenario\.transactionSignals\.reduce/);
+  // 이상거래 신호는 Mock과 Ollama 두 모드 모두에서 보여야 한다. Ollama 모드에서는
+  // FastAPI가 계산한 값을 그대로 쓴다.
+  assert.match(page, /data-testid="anomaly-signals"/);
+  assert.match(page, /lastGraphRun\.transaction_anomaly\.signals/);
+  assert.doesNotMatch(page, /isOllamaActual \? <>[\s\S]{0,400}백그라운드 이상거래 신호/);
 });

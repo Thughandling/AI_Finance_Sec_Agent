@@ -47,6 +47,14 @@ type LocalGraphResponse = {
     evidence: Array<{ type: string; keywords: string[]; score_added: number }>;
     already_transferred: boolean;
   };
+  transaction_anomaly?: {
+    score: number;
+    raw_score: number;
+    signals: Array<{ key: string; weight: number; label: string; value: string }>;
+    observed: string[];
+    in_call: boolean;
+    evaluated: boolean;
+  };
   alert?: {
     tier: number;
     tier_name: string;
@@ -117,6 +125,19 @@ export default function Home() {
   const retrieved = retrieveAndRerank(transcript || scenario.description, detection.riskType);
   const isOllamaActual = providerId === "ollama";
   const actualTrace = isOllamaActual ? lastGraphRun?.trace ?? [] : [];
+  // Ollama 모드에서는 FastAPI가 계산한 신호를 그대로 보여준다. 두 엔진은 동등하지만
+  // 화면에 뜬 값이 실제 서버 판정임을 확인할 수 있어야 한다.
+  const displayedAnomaly = isOllamaActual && lastGraphRun?.transaction_anomaly
+    ? {
+        ...emptyAnomaly,
+        score: lastGraphRun.transaction_anomaly.score,
+        rawScore: lastGraphRun.transaction_anomaly.raw_score,
+        signals: lastGraphRun.transaction_anomaly.signals,
+        observed: lastGraphRun.transaction_anomaly.observed,
+        inCall: lastGraphRun.transaction_anomaly.in_call,
+        evaluated: lastGraphRun.transaction_anomaly.evaluated,
+      }
+    : anomaly;
   const localAlert = planAlert(detection, anomaly);
   const displayedAlert: AlertPlan = isOllamaActual && lastGraphRun?.alert
     ? {
@@ -388,19 +409,19 @@ export default function Home() {
             {isOllamaActual ? <div className="verdict-row"><span>{lastGraphRun?.risk?.risk_type ?? "FastAPI 응답 대기"}</span><strong>{lastGraphRun?.risk?.verdict ?? "대기"}</strong></div> : <div className="verdict-row"><span>기대 라벨 {scenario.expectedLabel}</span><strong className={detection.verdict === scenario.expectedLabel ? "correct" : "wrong"}>{lineIndex < 0 ? "대기" : detection.verdict === scenario.expectedLabel ? "정탐" : scenario.expectedLabel === "정상" ? "오탐" : "미탐"}</strong></div>}
           </div>
 
-          {isOllamaActual ? <>
+          {isOllamaActual && <>
             <div className="section-title"><h3>규칙 기반 Safety 검사</h3><span>{lastGraphRun?.safety?.passed ? "통과" : "대기"}</span></div>
             <div className="safety-detail" data-testid="actual-safety-detail">
               {lastGraphRun?.safety ? Object.entries(lastGraphRun.safety.checks).map(([name, passed]) => <span key={name} className={passed ? "passed" : "failed"}>{passed ? "✓" : "!"} {name}</span>) : <span>FastAPI 검증 결과 대기</span>}
             </div>
-          </> : <>
-            <div className="section-title"><h3>백그라운드 이상거래 신호</h3><span>{anomaly.evaluated ? `합계 ${anomaly.rawScore} · 반영 ${anomaly.score}` : "대기"}</span></div>
-            <div className="signal-list">
-              {anomaly.signals.length > 0
-                ? anomaly.signals.map((signal) => <div className="signal-item" key={signal.key}><span>{signal.label}<small>{signal.value}</small></span><b className="risk">+{signal.weight}</b></div>)
-                : <div className="signal-item"><span>평소 거래 프로필과 차이 없음<small>금액·수취인·시간대·기기 모두 정상 범위</small></span><b>+0</b></div>}
-            </div>
           </>}
+
+          <div className="section-title"><h3>백그라운드 이상거래 신호</h3><span>{displayedAnomaly.evaluated ? `합계 ${displayedAnomaly.rawScore} · 반영 ${displayedAnomaly.score}` : "대기"}</span></div>
+          <div className="signal-list" data-testid="anomaly-signals">
+            {displayedAnomaly.signals.length > 0
+              ? displayedAnomaly.signals.map((signal) => <div className="signal-item" key={signal.key}><span>{signal.label}<small>{signal.value}</small></span><b className="risk">+{signal.weight}</b></div>)
+              : <div className="signal-item"><span>평소 거래 프로필과 차이 없음<small>금액·수취인·시간대·기기 모두 정상 범위</small></span><b>+0</b></div>}
+          </div>
 
           <div className="section-title"><h3>경보 전달 계획</h3><span>T{displayedAlert.tier} · {displayedAlert.tierName}</span></div>
           <div className="signal-list">

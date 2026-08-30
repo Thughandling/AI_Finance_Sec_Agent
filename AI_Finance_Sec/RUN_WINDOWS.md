@@ -234,3 +234,36 @@ npm run test:win
 - 모든 통화·거래 데이터는 **합성 데이터**다.
 - 1394 신고·상담, 112 신고, 지급정지 등 외부 조치는 **실제로 수행하지 않는다**.
 - Quick Tunnel URL은 임시이며 재기동 시 매번 바뀐다. 발표 직전 발급받아 사용한다.
+
+---
+
+## 알려진 문제 — `npm run start:win` 으로는 시연하지 말 것
+
+Windows에서 `vinext start`(프로덕션 서버)는 **하위 디렉터리의 정적 자산을 전부 404로
+응답한다.** `/og.png` 같은 루트 파일은 200이지만 `/assets/*.js`, `/assets/*.css`,
+`/data/*.json` 이 모두 404가 되어 CSS와 JS가 붙지 않는다. 화면이 통째로 깨져 보이고
+버튼도 동작하지 않는다.
+
+원인은 vinext 의존성의 Windows 경로 처리다.
+`node_modules/vinext/dist/server/static-file-cache.js` 가 파일을 색인할 때
+`path.relative()` 결과를 URL로 변환하지 않고 그대로 쓴다.
+
+```js
+relativePath: path.relative(base, fullPath)   // Windows: "assets\index.js"
+const pathname = "/" + relativePath;          // "/assets\index.js" 로 등록됨
+```
+
+요청 경로는 `/assets/index.js`(슬래시)이므로 영원히 매칭되지 않는다. 구분자가 없는
+루트 파일만 우연히 맞아떨어진다. macOS·Linux에서는 `path.relative`가 슬래시를
+반환하므로 발생하지 않는다.
+
+**대응**
+
+| 용도 | 사용할 명령 |
+|---|---|
+| 시연·개발 | `npm run dev:win` (http://localhost:3000) |
+| 전체 스택 시연 | `.\scripts\start-demo.ps1` |
+| 회귀 검증 | `npm run test:win` — 빌드 산출물을 worker로 직접 import하므로 이 버그의 영향을 받지 않는다 |
+
+> `dev:win` 서버는 IPv6(`[::1]:3000`)에만 바인딩된다. `127.0.0.1:3000` 이 아니라
+> **`localhost:3000`** 으로 접속해야 한다.

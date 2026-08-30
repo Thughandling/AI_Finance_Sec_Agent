@@ -36,6 +36,10 @@ cd AI_Finance_Sec
 powershell -ExecutionPolicy Bypass -File .\scripts\start-demo.ps1
 ```
 
+> ⚠️ Windows에서 `npm run start:win`(프로덕션 서버)으로는 시연하지 말 것.
+> vinext 의존성의 경로 버그로 정적 자산이 404가 되어 화면이 깨진다.
+> 원인과 대응은 [`AI_Finance_Sec/RUN_WINDOWS.md`](AI_Finance_Sec/RUN_WINDOWS.md) 참조.
+
 Ollama(로컬 경량 모델) + FastAPI + Next를 한 번에 띄우고 Cloudflare Quick Tunnel로
 공개 https URL을 발급한다. 상세 절차는 [`AI_Finance_Sec/RUN_WINDOWS.md`](AI_Finance_Sec/RUN_WINDOWS.md).
 
