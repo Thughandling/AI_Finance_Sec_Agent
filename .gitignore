@@ -43,6 +43,8 @@ tmp/*/*
 !tmp/**/*.mjs
 !tmp/**/*.py
 !tmp/**/*.json
+# 문서 렌더 원본 — PDF를 다시 만들려면 필요하다
+!tmp/**/*.html
 tmp/**/*.png
 tmp/**/*.webp
 tmp/**/*.bmp
