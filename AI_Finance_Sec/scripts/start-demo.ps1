@@ -12,6 +12,7 @@
     .\scripts\start-demo.ps1 -Model qwen2.5:1.5b
     .\scripts\start-demo.ps1 -SkipTunnel
     .\scripts\start-demo.ps1 -Dev
+    .\scripts\start-demo.ps1 -Watch          # 기동 후 상주하며 죽은 서비스 재기동
 #>
 [CmdletBinding()]
 param(
@@ -21,7 +22,9 @@ param(
     [int]$OllamaTimeoutSeconds = 120,
     [switch]$SkipTunnel,
     [switch]$Dev,
-    [switch]$SkipBuild
+    [switch]$SkipBuild,
+    [switch]$Watch,
+    [int]$WatchIntervalSeconds = 20
 )
 
 $ErrorActionPreference = "Stop"
@@ -100,6 +103,12 @@ if (-not (Test-Path (Join-Path $Root "node_modules"))) {
     exit 1
 }
 Write-Ok "node_modules 확인"
+
+# vinext는 Windows에서 하위 디렉터리 정적 자산을 404로 응답하는 경로 버그가 있다.
+# package.json의 postinstall이 이미 패치하지만, node_modules를 손으로 복원한 경우를
+# 대비해 여기서도 멱등 패치를 한 번 더 돌린다. 자세한 내용은 scripts/patch-vinext.mjs.
+& node (Join-Path $Root "scripts\patch-vinext.mjs")
+Write-Ok "vinext 정적 자산 패치 확인"
 
 # --------------------------------------------------------------------------
 Write-Step "1. Ollama 서버"
@@ -280,4 +289,69 @@ Write-Host "  종료           : .\scripts\stop-demo.ps1" -ForegroundColor DarkG
 Write-Host ""
 if ($publicUrl) {
     Write-Warn2 "공개 URL은 인터넷에 노출됩니다. 시연이 끝나면 stop-demo.ps1로 반드시 내리세요."
+}
+
+# --------------------------------------------------------------------------
+# -Watch: 상주 감시. 죽은 로컬 서비스를 같은 인자로 재기동한다.
+#   - 이 창을 닫거나 Ctrl+C 하면 감시만 멈춘다(서비스는 유지).
+#   - 완전 종료는 stop-demo.ps1.
+#   - 로그아웃/재부팅에도 살아 있어야 하면 이 명령을 작업 스케줄러에 등록한다
+#     (RUN_WINDOWS.md 5절).
+if (-not $Watch) { return }
+
+function Restart-Tracked([string]$Name, [scriptblock]$Launch) {
+    # 포트를 물고 있는 좀비 리스너 정리 후 재기동
+    $port = if ($Name -eq "web") { $WebPort } elseif ($Name -eq "backend") { $ApiPort } else { $null }
+    if ($port) {
+        Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue |
+            ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }
+    }
+    $proc = & $Launch
+    $script:tracked = @($script:tracked | Where-Object { $_.name -ne $Name })
+    $script:tracked += [pscustomobject]@{ name = $Name; pid = $proc.Id }
+    $state.processes = $script:tracked
+    $state | ConvertTo-Json -Depth 5 | Out-File -FilePath $StateFile -Encoding utf8
+    Write-Ok "$Name 재기동 (PID $($proc.Id))"
+}
+
+Write-Step "상주 감시 시작 (${WatchIntervalSeconds}s 간격) — 중지: Ctrl+C"
+
+while ($true) {
+    Start-Sleep -Seconds $WatchIntervalSeconds
+
+    if (-not (Test-Endpoint "$OllamaBase/api/tags")) {
+        Write-Warn2 "Ollama 응답 없음 - 재기동"
+        Restart-Tracked "ollama" {
+            Start-Process -FilePath $ollamaExe -ArgumentList "serve" `
+                -RedirectStandardOutput (Join-Path $LogDir "ollama.out.log") `
+                -RedirectStandardError  (Join-Path $LogDir "ollama.err.log") `
+                -WindowStyle Hidden -PassThru
+        }
+        Wait-Endpoint "$OllamaBase/api/tags" 40 "Ollama" | Out-Null
+    }
+
+    if (-not (Test-Endpoint "http://127.0.0.1:$ApiPort/health")) {
+        Write-Warn2 "백엔드 응답 없음 - 재기동"
+        Restart-Tracked "backend" {
+            Start-Process -FilePath $venvPython `
+                -ArgumentList "-m", "uvicorn", "backend.main:app", "--host", "127.0.0.1", "--port", "$ApiPort" `
+                -WorkingDirectory $Root `
+                -RedirectStandardOutput (Join-Path $LogDir "backend.out.log") `
+                -RedirectStandardError  (Join-Path $LogDir "backend.err.log") `
+                -WindowStyle Hidden -PassThru
+        }
+        Wait-Endpoint "http://127.0.0.1:$ApiPort/health" 60 "FastAPI" | Out-Null
+    }
+
+    if (-not (Test-Endpoint "http://localhost:$WebPort")) {
+        Write-Warn2 "프론트 응답 없음 - 재기동"
+        Restart-Tracked "web" {
+            Start-Process -FilePath $npmCmd -ArgumentList "run", $webScript `
+                -WorkingDirectory $Root `
+                -RedirectStandardOutput (Join-Path $LogDir "web.out.log") `
+                -RedirectStandardError  (Join-Path $LogDir "web.err.log") `
+                -WindowStyle Hidden -PassThru
+        }
+        Wait-Endpoint "http://localhost:$WebPort" 120 "Next" | Out-Null
+    }
 }

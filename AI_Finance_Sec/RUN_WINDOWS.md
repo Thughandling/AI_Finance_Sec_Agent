@@ -127,6 +127,26 @@ powershell -ExecutionPolicy Bypass -File .\scripts\start-demo.ps1
 | `-SkipBuild` | 이미 빌드되어 있을 때 빌드 생략 |
 | `-SkipTunnel` | 공개 URL 없이 로컬만 기동 |
 | `-WebPort 3100` / `-ApiPort 8100` | 포트 충돌 회피 |
+| `-Watch` | 기동 후 상주하며 죽은 서비스 자동 재기동 (상시 운영) |
+| `-WatchIntervalSeconds 20` | `-Watch` 점검 간격 (기본 20초) |
+
+> `start:win`은 프로덕션 서버다. 예전에는 Windows에서 `/assets/*`·`/data/*`가 전부
+> 404였으나(vinext 경로 버그), `scripts/patch-vinext.mjs`가 `npm install` 시
+> 자동 적용되어 해결됐다. `-Dev`는 이제 필요 없다.
+
+### 상시 운영 (판정 기간 등 장시간 무인 가동)
+
+```powershell
+# 이 창을 열어둔 채 상주 감시 (창을 닫으면 감시만 멈춤, 서비스는 유지)
+.\scripts\start-demo.ps1 -Watch
+
+# 로그아웃·재부팅에도 살리려면 작업 스케줄러에 등록
+schtasks /Create /TN "AI_Finance_Sec_Demo" /SC ONSTART /RL HIGHEST /F ^
+  /TR "powershell -ExecutionPolicy Bypass -WindowStyle Hidden -File C:\path\to\AI_Finance_Sec\scripts\start-demo.ps1 -Watch -SkipTunnel"
+```
+
+공개 URL이 필요하면 `-SkipTunnel`을 빼되, Quick Tunnel 주소는 재기동마다 바뀐다.
+고정 주소가 필요하면 Cloudflare **named tunnel**(계정·도메인 필요)로 전환한다.
 
 ---
 
@@ -193,7 +213,7 @@ npm run test:win
 .\backend\.venv\Scripts\python.exe backend\scripts\smoke_ollama.py
 ```
 
-기대 결과: 백엔드 29/29, 프론트 11/11, smoke에서 `turn_count` 1→2 유지.
+기대 결과: 백엔드 40/40, 프론트 20/20, smoke에서 `turn_count` 1→2 유지.
 
 ---
 
@@ -219,6 +239,8 @@ npm run test:win
 | cloudflared MSI가 멈춤 | 관리자 권한 프롬프트 대기 | `tools\cloudflared.exe` 독립 바이너리 사용 (1.1절) |
 | 공개 URL에서 BYOK 오류가 `error code: 502`로만 보임 | Cloudflare가 origin 5xx 본문을 자체 페이지로 교체 | 정상 동작. 상세 원문은 `http://localhost:3000`에서 확인 (예: `Authentication Fails, Your api key ... is invalid`) |
 | `npm run dev`가 파서 오류 | 스크립트가 bash 전용 문법 | Windows에서는 `dev:win` / `build:win` / `start:win` / `test:win` 사용 |
+| `start:win` 화면이 CSS·JS 없이 깨짐, `/assets/*` 404 | (해결됨) vinext 0.0.50 Windows 경로 버그 | `node scripts/patch-vinext.mjs` 실행. `npm install` 시 postinstall로 자동 적용됨 |
+| `No Python at '...Python312\python.exe'`, parity 테스트 2건 실패 | venv 베이스 인터프리터가 이동·삭제됨 | venv 재생성: `python -m venv backend\.venv` 후 `pip install -r backend\requirements.txt`. site-packages가 온전하면 `backend\.venv\pyvenv.cfg`의 `home`만 현재 Python 경로로 고쳐도 됨 |
 | `python`이 버전 미출력 | Store 앱 실행 별칭 | 앱 실행 별칭 해제 또는 절대경로 사용 |
 | 포트 충돌 | 3000/8000 점유 | `-WebPort` / `-ApiPort` 변경, 또는 `stop-demo.ps1` |
 | 터널 URL 미발급 | cloudflared 미설치·네트워크 차단 | `.demo-logs\tunnel.log` 확인, `-SkipTunnel`로 로컬 시연 |

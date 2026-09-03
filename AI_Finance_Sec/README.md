@@ -17,6 +17,10 @@
 > Windows에서는 `npm run dev`의 `VAR=x cmd` 접두사가 파싱되지 않으므로 `dev:win`·`build:win`·`start:win`·`test:win` 스크립트를 사용하고,
 > Ollama·FastAPI·Next·공개 터널은 `scripts/start-demo.ps1`이 한 번에 기동합니다.
 
+> **상시 배포(심사위원 상시 접속용)는 [`DEPLOY.md`](./DEPLOY.md).** 기본 Mock 모드는
+> 백엔드 없이 동작하므로 프론트를 Cloudflare Workers에 올리면 PC 의존성 없는 영구 URL이 나옵니다.
+> `npm run deploy` (최초 1회 `npx wrangler login` 필요).
+
 Node.js 22.13 이상에서 다음 명령을 실행합니다.
 
 ```bash

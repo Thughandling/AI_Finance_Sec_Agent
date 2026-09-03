@@ -6,12 +6,15 @@
     "node": ">=22.13.0"
   },
   "scripts": {
+    "postinstall": "node scripts/patch-vinext.mjs",
     "dev": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext dev",
     "build": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext build",
     "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
     "dev:win": "vinext dev",
     "build:win": "vinext build",
     "start:win": "vinext start",
+    "deploy": "vinext deploy",
+    "deploy:dry": "vinext build && wrangler deploy --dry-run --outdir .wrangler/dry",
     "test:win": "npm run build:win && node --test \"tests/*.test.mjs\"",
     "test": "npm run build && node --test tests/*.test.mjs",
     "test:frontend": "npm run build && node --test tests/*.test.mjs",
