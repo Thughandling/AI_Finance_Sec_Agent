@@ -58,6 +58,19 @@ https://ai-finance-sec.<서브도메인>.workers.dev
 npm run deploy
 ```
 
+## 자동 배포 (권장 — 랩톱 없이도 항상 최신)
+
+`.github/workflows/deploy.yml`이 있다. GitHub 저장소 **Settings → Secrets and
+variables → Actions**에 두 개만 넣으면 `main` 푸시마다 자동 재배포된다.
+
+| Secret | 값 |
+|---|---|
+| `CLOUDFLARE_API_TOKEN` | 위 1번 B의 토큰 |
+| `CLOUDFLARE_ACCOUNT_ID` | 계정 ID |
+
+이러면 배포가 특정 PC의 `wrangler login` 캐시에 묶이지 않는다. Actions 탭에서
+"Run workflow"로 수동 배포도 된다.
+
 ## 확인 / 트러블슈팅
 
 ```powershell

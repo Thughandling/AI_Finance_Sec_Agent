@@ -1,0 +1,50 @@
+# 심사위원 상시 접속용 고정 URL — main에 푸시될 때마다 Cloudflare Workers로 자동 배포.
+#
+# 1회 준비 (GitHub 저장소 Settings > Secrets and variables > Actions):
+#   CLOUDFLARE_API_TOKEN   - dash.cloudflare.com/profile/api-tokens, "Edit Cloudflare Workers" 템플릿
+#   CLOUDFLARE_ACCOUNT_ID  - dash.cloudflare.com/<account-id> URL 에서 확인
+#
+# 이후 코드가 main에 올라갈 때마다 재배포되고, PC·랩톱과 무관하게 URL이 살아 있다.
+#   https://ai-finance-sec.<서브도메인>.workers.dev  (재배포해도 불변)
+#
+# 수동 실행: Actions 탭 > "Deploy to Cloudflare Workers" > Run workflow
+
+name: Deploy to Cloudflare Workers
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "AI_Finance_Sec/**"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-workers
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: AI_Finance_Sec
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: AI_Finance_Sec/package-lock.json
+
+      - run: npm ci
+
+      - name: Rendered-HTML smoke (mock path is what judges see)
+        run: npm run build:win && node --test tests/rendered-html.test.mjs
+
+      - name: Deploy
+        run: npx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
