@@ -405,15 +405,117 @@ export function retrieveAndRerank(query: string, riskType: string): RetrievalRes
     .slice(0, 3);
 }
 
-export function buildMockAnswer(result: DetectionResult, _documents: RetrievalResult[], userText: string): string {
-  const transferred = /이미.*(송금|이체)|보냈|입금했/.test(userText);
-  if (transferred) {
-    return "이미 송금하셨다면 지금은 속도가 중요합니다. 추가 송금을 멈추고 1394에 신고·상담하세요. 긴급한 상황은 112에 신고하고, 해당 금융회사에 직접 연락해 지급정지를 요청하세요. 이체내역·계좌번호·통화와 문자 기록도 보관해 주세요.";
+type MockIntent = "victim" | "safeAccount" | "verifyReal" | "onCall" | "appInstall" | "why" | "how" | "default";
+
+/** 자유 질문의 의도를 규칙으로 분류한다. LLM 없이 결정론적으로 동작한다. */
+function detectMockIntent(raw: string): MockIntent {
+  const c = raw.replace(/\s+/g, "").toLowerCase();
+  if (/(이미|벌써|방금).{0,8}(송금|이체|입금)|돈을보냈|보내버렸|입금했|계좌(번호)?를?알려(줬|주었|드렸|줌)|otp를?(알려|불러)|(상품권|기프트카드).{0,6}(핀|번호).{0,6}(알려|불러|보냈)|현금을?(전달|건넸|줬)/.test(c)) return "victim";
+  if (/(안전계좌|보호계좌|임시보관계좌|검수계좌|안전한계좌)/.test(c) && /(뭐|무엇|뭔가요|맞나요|있나요|진짜|정말|라는게|인가요|왜)/.test(c)) return "safeAccount";
+  if (/(진짜|실제로?|정말로?|진짜로).{0,10}(검찰|검사|수사관|경찰|금감원|금융감독원|은행|국세청|우체국|직원)|(검찰|경찰|금감원|은행).{0,6}(맞나요|맞아요|진짜인가|실제인가|사칭)/.test(c)) return "verifyReal";
+  if (/지금.{0,4}통화(중|하고)|통화(중|하는중)이(에요|고|라)|옆에서.{0,6}(시키|불러|말하)|끊지말라(고)?|전화(를)?끊으면/.test(c)) return "onCall";
+  if (/(앱|어플|apk|프로그램|원격제어|팀뷰어|애니데스크).{0,8}(설치|깔|받으|다운)/.test(c)) return "appInstall";
+  if (/(왜|무슨근거|어떻게알아|근거가뭐|근거가무|왜위험|왜사기)/.test(c)) return "why";
+  if (/(어떻게(해|하나|해야|하죠|해요|하면)|뭘해야|무엇부터|무엇을해야|어떤걸해야|방법이|어떡|대처|대응)/.test(c)) return "how";
+  return "default";
+}
+
+function firstSentence(text: string): string {
+  const end = text.search(/[.。!?]\s|[.。!?]$/);
+  const clause = end >= 0 ? text.slice(0, end + 1) : text;
+  return clause.length > 96 ? `${clause.slice(0, 94)}…` : clause;
+}
+
+/** 마지막 글자의 받침 유무. 한글 음절이 아니면 받침 없음으로 본다. */
+function hasBatchim(word: string): number {
+  const code = word.charCodeAt(word.length - 1);
+  if (Number.isNaN(code) || code < 0xac00 || code > 0xd7a3) return -1;
+  return (code - 0xac00) % 28;
+}
+const topicParticle = (word: string) => `${word}${hasBatchim(word) > 0 ? "은" : "는"}`;
+const instrumentalParticle = (word: string) => {
+  const jong = hasBatchim(word);
+  return `${word}${jong <= 0 || jong === 8 ? "로" : "으로"}`;
+};
+
+/** verifyAnswer의 필수 조건(공식 확인 문구, 위험 시 중단·종료 문구)을 보장한다. */
+function ensureCompliant(body: string, verdict: ExpectedLabel): string {
+  let out = body.trim();
+  const missingAction = verdict !== "정상" && !/중단|종료|지급정지/.test(out);
+  const missingVerify = !/확인|대표번호/.test(out);
+  if (missingAction || missingVerify) {
+    out += verdict === "정상"
+      ? " 상대가 새로 송금이나 앱 설치를 요구하면 중단하고, 공식 대표번호로 사실을 확인하세요."
+      : " 지금은 통화를 종료하고 추가 송금·앱 설치를 중단한 뒤, 상대가 준 번호가 아닌 공식 대표번호로 사실을 확인하세요.";
   }
-  if (result.verdict === "정상") {
-    return "현재 문장에서는 강한 사기 징후가 확인되지 않았습니다. 다만 상대가 송금이나 앱 설치를 새로 요구하면 중단하고, 공식 대표번호로 상담 내용을 다시 확인하세요.";
+  return out;
+}
+
+/**
+ * 결정론적 안전 응답 생성기. 3종 고정 문구 대신, 이미 계산된 위험유형·근거·검색근거·
+ * 이상거래 신호를 조합하고 자유 질문의 의도별로 답한다. 단일 CTA는 정책 허용목록 안에서만
+ * 고른다. 모델 자유문은 사용하지 않는다.
+ */
+export function buildMockAnswer(
+  result: DetectionResult,
+  documents: RetrievalResult[],
+  userText: string,
+  anomaly?: TransactionAnomaly | null,
+): string {
+  const intent = detectMockIntent(userText);
+  const top = documents[0];
+  const citeClause = top ? ` ${topicParticle(top.authority)} "${firstSentence(top.content)}"라고 안내합니다.` : "";
+  const primaryEvidence = result.evidence.find((item) => !item.startsWith("정상성"));
+  const evidencePhrase = primaryEvidence
+    ? primaryEvidence.split(": ").slice(1).join(": ") || primaryEvidence
+    : "복합 위험 신호";
+  const anomalyClause = anomaly?.evaluated && anomaly.signals.length > 0
+    ? ` 이번 이체에서는 '${anomaly.signals.slice(0, 2).map((signal) => signal.label).join("', '")}' 같은 평소와 다른 신호도 함께 잡혔습니다.`
+    : "";
+
+  if (intent === "victim" || /이미.*(송금|이체)|보냈|입금했/.test(userText)) {
+    return "이미 이체하셨다면 지금은 시간이 가장 중요합니다. 추가 송금·앱 설치를 즉시 중단하세요. "
+      + "이어서 해당 금융회사 콜센터에 지급정지를 요청하고, 1394에 신고·상담하고, 긴급할 때는 112에 신고하세요. "
+      + "통화·문자·이체내역 증거를 그대로 보관하고, 절차는 각 기관 공식 대표번호로 확인하세요. "
+      + "신고와 지급정지는 본인이 직접 요청해야 합니다.";
   }
-  return `현재 ${result.level} 단계입니다. ${result.evidence[0] ?? "복합 위험 신호"}가 확인됐습니다. 통화를 종료하고 송금·앱 설치를 중단한 뒤, 상대가 알려준 번호가 아닌 공식 대표번호로 확인하세요.`;
+
+  let body: string;
+  switch (intent) {
+    case "safeAccount":
+      body = `"안전계좌"·"보호계좌"·"임시보관계좌"는 공식적으로 존재하지 않는 표현입니다. `
+        + `검찰·경찰·금융감독원·은행은 어떤 명목으로도 특정 계좌로 돈을 옮기라고 하지 않습니다.${citeClause}`;
+      break;
+    case "verifyReal":
+      body = "상대가 진짜 그 기관 사람인지는 전화로 확인할 수 없습니다. 지금 통화를 끊고, 상대가 알려준 번호가 아니라 "
+        + "기관 공식 대표번호로 직접 전화해 사실을 확인하세요. 실제 기관이라면 이 절차를 문제 삼지 않습니다.";
+      break;
+    case "onCall":
+      body = "지금 통화 중이라면 상대가 화면을 함께 보고 있을 수 있습니다. 아무것도 입력하거나 누르지 말고, "
+        + "통화를 끊는 것이 가장 안전합니다. 끊은 뒤 공식 대표번호로 사실을 확인하세요.";
+      break;
+    case "appInstall":
+      body = "요청받은 앱이나 원격제어 프로그램(팀뷰어·애니데스크 등)을 설치하지 마세요. 설치하면 상대가 기기를 "
+        + "조종하거나 인증번호를 가로챌 수 있습니다. 이미 설치했다면 기기의 인터넷 연결을 끊고 공식 대표번호로 확인하세요.";
+      break;
+    case "why":
+      body = `이 통화를 ${instrumentalParticle(result.riskType)} 본 근거는 "${evidencePhrase}"입니다.${anomalyClause}${citeClause}`;
+      break;
+    case "how":
+      body = result.verdict === "정상"
+        ? "지금 급히 할 일은 없습니다. 상대가 송금이나 앱 설치를 요구하면 멈추고, 상담 내용은 공식 대표번호·앱에서 다시 확인하세요."
+        : "순서대로 하세요. 통화를 즉시 끊고, 추가 송금·앱 설치를 중단하고, 통화·문자·계좌 기록을 보관한 뒤, "
+          + "상대가 준 번호가 아닌 공식 대표번호로 사실을 확인하세요. 위험도가 높거나 이미 보냈다면 해당 금융회사 "
+          + "콜센터에 지급정지를 요청하고 1394에 상담하세요.";
+      break;
+    default: {
+      const evidenceTail = /신호$/.test(evidencePhrase) ? "가 확인됐습니다" : " 신호가 확인됐습니다";
+      body = result.verdict === "정상"
+        ? `현재 문장에서는 강한 사기 징후가 확인되지 않았습니다.${citeClause}`
+        : `현재 ${result.level} 단계입니다. ${evidencePhrase}${evidenceTail}.${anomalyClause}${citeClause}`;
+    }
+  }
+  return ensureCompliant(body, result.verdict);
 }
 
 export function verifyAnswer(answer: string, result: DetectionResult): { passed: boolean; checks: string[] } {

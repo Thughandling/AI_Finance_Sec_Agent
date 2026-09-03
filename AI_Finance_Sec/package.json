@@ -19,7 +19,7 @@
     "test": "npm run build && node --test tests/*.test.mjs",
     "test:frontend": "npm run build && node --test tests/*.test.mjs",
     "test:backend": "python3 -m pytest backend/tests -q",
-    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
+    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern .wrangler",
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {

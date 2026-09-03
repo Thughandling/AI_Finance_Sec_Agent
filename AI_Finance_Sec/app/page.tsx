@@ -193,7 +193,7 @@ export default function Home() {
     const timer = window.setTimeout(() => {
       if (lineIndex >= scenario.lines.length - 1) {
         setPlaying(false);
-        const answer = buildMockAnswer(detection, retrieved, transcript);
+        const answer = buildMockAnswer(detection, retrieved, transcript, anomaly);
         setMessages((previous) => [...previous, { role: "assistant", text: answer, model: "Mock Safety Engine", actions: detection.verdict === "사기" }]);
         return;
       }
