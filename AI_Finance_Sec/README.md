@@ -6,7 +6,7 @@
 
 - API 키 없이 끝까지 재현되는 결정론적 Mock 데모
 - Ollama Local(Qwen 2.5 7B)과 OpenAI, DeepSeek, Claude, Gemini, Qwen Cloud BYOK 모델 라우터
-- 기관 사칭·대출 사기·가족 빙자·정상 Hard Negative 합성 시나리오
+- 기관 사칭·대출 사기·가족 빙자·**완곡 표현 사칭(의도된 미탐)**·정상 Hard Negative 5개 합성 시나리오
 - State → 병렬 탐지 → RAG → RRF 리랭킹 → 모델 생성 → 규칙 기반 Safety 검사 흐름
 - 통화·거래 결합 위험도, 서버가 선택한 검색 근거 Top 3, 정탐·오탐·미탐 표시
 - 38건 회귀 검증셋·40건 홀드아웃과 Macro F1/Recall 요약(블라인드 일반화 한계 병기)
