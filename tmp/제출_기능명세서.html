@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><title>2026 금융 AI Challenge 기능 명세서 — AI_Finance_Sec</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "맑은 고딕","Malgun Gothic",sans-serif; font-size: 10.5pt; line-height: 1.62; color: #111; margin: 0; }
+  h1 { font-size: 15pt; text-align: center; margin: 0 0 4mm; letter-spacing: -.2px; }
+  .att { text-align: center; font-size: 9.5pt; color: #555; margin-bottom: 1mm; }
+  table { width: 100%; border-collapse: collapse; }
+  .meta td { border: 1px solid #333; padding: 2.4mm 3mm; }
+  .meta .lb { width: 24mm; background: #f0f0f0; font-weight: 700; text-align: center; }
+  .note { text-align: right; font-size: 9pt; color: #666; margin: 2mm 0 3mm; }
+  .sec { border: 1px solid #333; margin-bottom: 3.4mm; page-break-inside: avoid; }
+  .sec > .hd { background: #eceff3; border-bottom: 1px solid #333; padding: 2.2mm 3mm; font-weight: 700; font-size: 11pt; }
+  .sec > .bd { padding: 3mm; }
+  .sec p { margin: 0 0 2.6mm; text-align: justify; }
+  .sec p:last-child { margin-bottom: 0; }
+  .req { color: #c0392b; font-weight: 700; }
+  code { font-family: "Consolas","D2Coding",monospace; font-size: 9.6pt; background: #f4f5f7; padding: 0 .6mm; border-radius: 2px; }
+  .gloss { border: 1px solid #666; background: #fafafa; padding: 3mm 3.5mm; margin-top: 4mm; }
+  .gloss h2 { font-size: 10.5pt; margin: 0 0 2mm; }
+  .gloss dl { margin: 0; font-size: 9.4pt; line-height: 1.55; }
+  .gloss dt { float: left; clear: left; font-weight: 700; margin-right: 1.5mm; }
+  .gloss dd { margin: 0 0 1.2mm 0; }
+</style></head><body>
+
+<div class="att">첨부 2</div>
+<h1>2026 금융 AI Challenge 기능 명세서</h1>
+
+<table class="meta">
+  <tr><td class="lb">팀명</td><td>GODknows</td><td class="lb">구성원 성명</td><td>고동영</td></tr>
+</table>
+<div class="note">( <span class="req">*</span> 필수항목 )</div>
+
+<div class="sec"><div class="hd">1. MVP 구현 범위 <span class="req">*</span></div><div class="bd">
+<p>합성 시나리오·통화/거래 탐지·경량 RAG/RRF·정탐/오탐·Mock/Ollama Local/5개 Cloud Provider를 구현했습니다. 로컬 P1은 Next → FastAPI → 실제 LangGraph 병렬 fan-out/fan-in → Ollama <code>qwen2.5:7b</code> → guarded_policy/Safety → InMemorySaver 멀티턴을 지원합니다.</p>
+<p>실시간 STT·거래 스트림·금융사 레거시·실제 신고/지급정지·개인정보 저장은 구현 범위에 포함하지 않았습니다.</p>
+</div></div>
+
+<div class="sec"><div class="hd">2. 주요 기능 목록 <span class="req">*</span></div><div class="bd">
+<p>F01 샘플재생, F02 위험탐지, F03 거래결합, F04 경량 RAG/RRF Top3, F05 Provider 라우터, F06 allowlist guarded_policy, F07 규칙 Safety/폴백, F08 실제 LangGraph trace, F09 session 멀티턴, F10 응답 투명성, F11 합성 회귀평가 — 모두 구현을 완료했습니다.</p>
+<p>공개 P0는 배포 URL에서 Mock과 Cloud BYOK를 실행합니다. 로컬 P1은 localhost의 Ollama·FastAPI·Next 3개 프로세스에서 실행하며 공개 서버는 사용자 PC의 Ollama에 접근할 수 없습니다.</p>
+</div></div>
+
+<div class="sec"><div class="hd">3. 사용자 이용 흐름 <span class="req">*</span></div><div class="bd">
+<p>공개: URL → Mock → 합성 시나리오 → simulated flow·위험·거래·검색 근거 확인.<br>
+로컬: <code>ollama serve</code> → FastAPI :8000 → Next :3000 → Ollama Local 선택 → 질문 → actual trace·session·turn·guarded_policy를 확인합니다.</p>
+</div></div>
+
+<div class="sec"><div class="hd">4. AI 및 데이터 처리 방식 <span class="req">*</span></div><div class="bd">
+<p>FastAPI ChatState 저장 후 <code>transaction_signal_agent</code>가 통화와 독립적으로 거래 이상신호를 만들고, <code>structured_risk_agent</code>가 규칙 판정과 구조화 Qwen 판정을 융합한 뒤 <code>knowledge_agent</code>·<code>policy_agent</code>를 병렬 실행해 <code>ollama_generate</code>로 fan-in하고 <code>safety_verifier</code>·<code>alert_planner</code>를 거쳐 반환합니다(총 9 Node, Qwen 호출 2회). Qwen은 실제 호출되지만 자유문은 폐기하며 서버 allowlist가 guarded_policy를 구성하고 규칙 기반 Safety 검사를 거쳐 반환합니다.</p>
+<p>입력은 합성 통화 문장·거래 신호·질문입니다. 출력은 위험도·이유·서버 선택 검색 근거·정책 행동·response_mode·trace입니다. 38건 회귀셋과 40건 고정 홀드아웃은 회귀평가 기준선이며 실사용 성능을 주장하는 수치가 아닙니다. 처음 보는 표현으로 평가한 독립 블라인드 40건에서는 2026-08-14 기준 Macro F1 40.5%로 떨어졌고, 이 일반화 한계를 데모 4번 시나리오에서 미탐으로 그대로 재현합니다.</p>
+<p>실제 개인정보와 계좌정보는 저장하지 않습니다. 로컬 Qwen 자유문은 State·API·UI 어디에도 남기지 않습니다. Cloud BYOK는 React state와 Next 1회 요청을 경유하며 앱 저장 기능은 없지만 호스팅 사업자와 Provider의 로그 정책은 별개입니다.</p>
+</div></div>
+
+<div class="sec"><div class="hd">5. MVP 검증 방법 <span class="req">*</span></div><div class="bd">
+<p>공개 URL에서 Mock 기관사칭·완곡표현 미탐·정상 Hard Negative를 실행해 위험·거래·검색 근거를 비교합니다. 완곡표현 시나리오는 같은 수법이라도 규칙 어휘를 피하면 통화 탐지가 실패함을 보여주고, 그때도 백그라운드 거래 신호가 단독으로 경보를 만드는 이중 트랙을 확인합니다. 실제 Qwen은 로컬에서 Ollama → FastAPI → Next를 실행하고 Ollama Local 선택 후 actual trace와 guarded_policy를 확인합니다.</p>
+<p>Mock 모드는 계정이 필요하지 않습니다. ‘안전계좌로 즉시 이체’는 위험, ‘지금 송금할 필요 없음’은 정상으로 판정합니다. 피해발생 응답은 1394·긴급 시 112·해당 금융회사 연락·지급정지 요청을 모두 포함합니다. Cloud Provider를 쓸 때만 사용자 API 키가 필요합니다.</p>
+<p>최신 Chrome·Edge·Safari를 권장합니다. 로컬 P1은 Ollama <code>qwen2.5:7b</code>·Python FastAPI :8000·Next :3000이 필요합니다. 검증은 <code>npm test</code>(Windows는 <code>npm run test:win</code>), <code>pytest</code>, <code>smoke_ollama.py</code>로 수행합니다.</p>
+<p>프론트·백엔드 자동검사와 동일 session 2턴 smoke를 통과했습니다. 모든 데이터와 수치는 소형 합성 회귀 기준선입니다. 실제 사기 확정·거래차단·1394/112 신고·금융회사 지급정지는 수행하지 않고, 실시간 처리·개인정보·감사·기관 연동은 P2 범위입니다.</p>
+</div></div>
+
+<div class="gloss">
+<h2>※ 용어 설명 — 본문에 쓰인 기술 용어를 풀어 씁니다.</h2>
+<dl>
+<dt>P0 / P1 / P2</dt><dd>: 구현 우선순위입니다. P0은 공개 데모, P1은 로컬 실제 모델 데모, P2는 이번 범위에서 제외한 향후 과제입니다.</dd>
+<dt>Mock</dt><dd>: 외부 서비스나 API 키 없이 같은 입력에 항상 같은 결과를 내는 내장 시연 모드입니다.</dd>
+<dt>BYOK</dt><dd>: 심사위원이 본인의 API 키를 직접 입력해 실제 모델을 호출하는 방식입니다. 키는 저장하지 않습니다.</dd>
+<dt>LangGraph / Node</dt><dd>: 처리 단계를 그래프로 연결해 실행하는 구조이며, Node는 그 한 단계입니다.</dd>
+<dt>병렬 fan-out / fan-in</dt><dd>: 여러 단계를 동시에 실행한 뒤 결과를 한곳에 모으는 방식입니다.</dd>
+<dt>RAG</dt><dd>: 답변에 앞서 관련 근거 문서를 먼저 찾아오는 방식입니다.</dd>
+<dt>RRF</dt><dd>: 서로 다른 검색 순위를 하나로 합쳐 최종 순위를 정하는 방법입니다.</dd>
+<dt>guarded_policy</dt><dd>: 모델이 만든 문장을 그대로 쓰지 않고, 서버가 미리 허용한 안내 문장만 골라 답변하는 안전 장치입니다.</dd>
+<dt>allowlist</dt><dd>: 미리 허용한 항목만 사용하도록 제한한 목록입니다.</dd>
+<dt>정탐 / 오탐 / 미탐</dt><dd>: 정탐은 위험을 옳게 찾은 경우, 오탐은 정상을 위험이라 잘못 본 경우, 미탐은 위험을 놓친 경우입니다.</dd>
+<dt>Hard Negative</dt><dd>: 위험해 보이는 단어가 있지만 실제로는 정상인 사례로, 오탐을 걸러내는지 확인하는 시험 문항입니다.</dd>
+<dt>Macro F1</dt><dd>: 위험과 정상 두 부류를 똑같이 중요하게 보고 계산한 종합 정확도 지표입니다.</dd>
+<dt>회귀셋 / 홀드아웃 / 블라인드</dt><dd>: 회귀셋은 이미 고친 문제의 재발을 보는 시험지, 홀드아웃은 따로 떼어 둔 시험지, 블라인드는 개발 중 한 번도 보지 않은 새 문장으로 보는 시험지입니다.</dd>
+<dt>trace</dt><dd>: 실제로 어떤 단계를 거쳐 결과가 나왔는지 기록한 실행 이력입니다.</dd>
+<dt>STT</dt><dd>: 통화 음성을 글자로 바꾸는 기술이며 이번 범위에서는 사용하지 않았습니다.</dd>
+<dt>1394 / 지급정지</dt><dd>: 1394는 보이스피싱 24시간 통합신고·상담 번호이고, 지급정지는 송금된 돈이 인출되지 않도록 계좌를 묶는 조치입니다.</dd>
+</dl>
+</div>
+
+</body></html>
