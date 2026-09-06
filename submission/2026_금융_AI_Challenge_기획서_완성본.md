@@ -3,7 +3,8 @@
 > 서비스명: **AI_Finance_Sec — 송금 전 마지막 판단을 돕는 AI 금융 보안 비서**  
 > 제안 형태: **은행 모바일 앱 연계형 B2B2C 고객보호 서비스**  
 > 공개 데모: `https://ai-finance-sec.headonggumdo.chatgpt.site`  
-> 팀명·구성원: `[최종 입력 필요]`
+> 팀명: **GODknows** (개인 참가)  
+> 구성원 성명: **고동영**
 
 ## 1. 아이디어 핵심 요약
 

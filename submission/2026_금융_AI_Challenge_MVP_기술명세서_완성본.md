@@ -1,6 +1,7 @@
 # 2026 금융 AI Challenge MVP 기술명세서
 
 > 서비스명: **AI_Finance_Sec**  
+> 팀명: **GODknows** (개인 참가) · 구성원 성명: **고동영**  
 > 구현 상태: P0 공개 Mock 데모 + P1 로컬 Qwen/LangGraph 데모  
 > 공개 데모: `https://ai-finance-sec.headonggumdo.chatgpt.site`  
 > 문서 기준 구현: `49e1d1387f415d03675cab97e84960d9df7ec020` (2026-09-06)
