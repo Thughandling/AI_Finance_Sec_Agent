@@ -348,14 +348,16 @@ export default function Home() {
             <span>{playing ? "Ⅱ" : "▶"}</span>{playing ? "분석 일시정지" : lineIndex >= scenario.lines.length - 1 ? "다시 분석하기" : "샘플 분석 시작"}
           </button>
           <div className="eval-summary">
-            <div><span>회귀셋 {evaluation.total}건</span><strong>{percent(evaluation.macroF1)}</strong></div>
-            <div><span>독립 블라인드 40건</span><strong>40.5%</strong></div>
-            <div><span>기준일</span><strong>26.09.06</strong></div>
+            <div><span>회귀셋 {evaluation.total}건 Macro F1</span><strong>{percent(evaluation.macroF1)}</strong></div>
+            <div><span>홀드아웃 40건 Macro F1</span><strong>100%</strong></div>
+            <div><span>독립 블라인드 Macro F1</span><strong>40.5%</strong></div>
           </div>
-          {/* 회귀셋 성능을 일반화 성능으로 오해하지 않도록 한계를 같은 자리에 붙인다. */}
+          {/* 수치별 측정 조건과 시점을 분리해 표기한다. 40.5%는 8월 측정이며 당시 엔진이 지금과 다르다. */}
           <p className="demo-note">
-            회귀셋 {evaluation.total}건은 이미 고친 실패의 재발만 검사합니다. 처음 보는 표현에서는
-            Macro F1 40.5%로 떨어지며, 4번 시나리오가 그 미탐을 그대로 재현합니다.
+            앞의 두 수치는 재현 가능하지만(`npm run test:win`) 개발 중 결과를 보고 규칙을 고쳤으므로
+            블라인드가 아닙니다. 처음 보는 표현으로 평가한 독립 블라인드 40건에서는 2026-08-14 기준
+            Macro F1 40.5%·사기 Recall 10%였습니다. 이후 구조화 판정을 도입했으나 새 표현 일반화는
+            여전히 미해결이며, 4번 시나리오가 그 미탐을 재현합니다.
           </p>
           <p className="demo-note">데모 전용 합성 데이터 · 실제 금융기관 조치 없음</p>
         </aside>

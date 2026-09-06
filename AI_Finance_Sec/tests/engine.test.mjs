@@ -205,6 +205,58 @@ test("returns the expected RAG Top1 for every demo scenario", async () => {
   }
 });
 
+test("never reassures a user who says they already sent money", async () => {
+  const { analyzeText, retrieveAndRerank, buildMockAnswer } = await engine();
+  // 규칙 어휘를 조금씩 벗어난 피해 신고 표현. 전부 골든타임 4요소가 나와야 한다.
+  const victimPhrasings = [
+    "이미 송금했어요",
+    "송금했습니다",
+    "송금 완료했어요",
+    "이체 눌렀어요",
+    "돈 다 부쳤어요",
+    "계좌로 옮겼어요",
+    "인증번호 불러줬어요",
+    "현금 전달했어요",
+  ];
+  for (const text of victimPhrasings) {
+    const detection = analyzeText(text, 0);
+    const answer = buildMockAnswer(detection, retrieveAndRerank(text, detection.riskType), text);
+    assert.doesNotMatch(answer, /강한 사기 징후가 확인되지 않았습니다|급한 조치가 필요해 보이지 않습니다/, text);
+    for (const required of ["지급정지", "1394", "112", "증거"]) {
+      assert.match(answer, new RegExp(required), `${text} → "${required}" 누락`);
+    }
+  }
+});
+
+test("surfaces transaction anomalies in the customer sentence even when the call detector misses", async () => {
+  const { analyzeText, retrieveAndRerank, buildMockAnswer, detectTransactionAnomaly, scenarios, verifyAnswer } = await engine();
+  const evasive = scenarios.find((scenario) => scenario.id === "evasive");
+  const anomaly = detectTransactionAnomaly(evasive.transactionContext);
+  const transcript = evasive.lines.map((line) => line.text).join(" ");
+  const detection = analyzeText(transcript, anomaly.score);
+  const answer = buildMockAnswer(detection, retrieveAndRerank(transcript, detection.riskType), transcript, anomaly);
+
+  // 우측 패널이 T2 경보를 띄우는데 고객 문장만 "이상 없음"이면 안 된다.
+  assert.doesNotMatch(answer, /강한 사기 징후가 확인되지 않았습니다/);
+  assert.match(answer, /평소 패턴과 다릅니다|평소와 다른 신호/);
+  assert.match(answer, /공식 대표번호/);
+  // 전제가 거짓인 "정상 상담" 근거를 인용해 미탐을 정당화하면 안 된다.
+  assert.doesNotMatch(answer, /위험 단어만으로 사기로 단정하지 않습니다/);
+  assert.ok(verifyAnswer(answer, detection).passed, "안전 검사를 통과해야 한다");
+
+  // 이상신호가 없는 진짜 정상 상담에서는 기존 문구가 유지되어야 한다(과잉 경고 방지).
+  const normal = scenarios.find((scenario) => scenario.id === "normal");
+  const normalText = normal.lines.map((line) => line.text).join(" ");
+  const normalDetection = analyzeText(normalText, 0);
+  const normalAnswer = buildMockAnswer(
+    normalDetection,
+    retrieveAndRerank(normalText, normalDetection.riskType),
+    normalText,
+    detectTransactionAnomaly(normal.transactionContext),
+  );
+  assert.match(normalAnswer, /강한 사기 징후가 확인되지 않았습니다/);
+});
+
 test("keeps the known-limitation scenario an honest miss that transaction signals still catch", async () => {
   const { analyzeText, detectTransactionAnomaly, planAlert, scenarios } = await engine();
   const evasive = scenarios.find((scenario) => scenario.id === "evasive");

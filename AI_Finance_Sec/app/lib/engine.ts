@@ -436,7 +436,10 @@ function detectMockIntent(raw: string): MockIntent {
   if (/(안전계좌|보호계좌|임시보관계좌|검수계좌|안전한계좌)/.test(c) && /(뭐|무엇|뭔가요|맞나요|있나요|진짜|정말|라는게|인가요|왜)/.test(c)) return "safeAccount";
   if (/(진짜|실제로?|정말로?|진짜로).{0,10}(검찰|검사|수사관|경찰|금감원|금융감독원|은행|국세청|우체국|직원)|(검찰|경찰|금감원|은행).{0,6}(맞나요|맞아요|진짜인가|실제인가|사칭)/.test(c)) return "verifyReal";
   if (/지금.{0,4}통화(중|하고)|통화(중|하는중)이(에요|고|라)|옆에서.{0,6}(시키|불러|말하)|끊지말라(고)?|전화(를)?끊으면/.test(c)) return "onCall";
-  if (/(앱|어플|apk|프로그램|원격제어|팀뷰어|애니데스크).{0,8}(설치|깔|받으|다운)/.test(c)) return "appInstall";
+  // "앱을 설치하실 필요는 없습니다" 같은 부정문은 설치 요구가 아니다. 정상 상담을 위험 안내로
+  // 오분류하면 Hard Negative 시연이 무너진다.
+  const installNegated = /(설치|깔|받으|다운)[^.]{0,14}(필요.{0,2}없|않아도|안해도|하지마|말라|마세요|불필요)/.test(c);
+  if (!installNegated && /(앱|어플|apk|프로그램|원격제어|팀뷰어|애니데스크).{0,8}(설치|깔|받으|다운)/.test(c)) return "appInstall";
   if (/(왜|무슨근거|어떻게알아|근거가뭐|근거가무|왜위험|왜사기)/.test(c)) return "why";
   if (/(어떻게(해|하나|해야|하죠|해요|하면)|뭘해야|무엇부터|무엇을해야|어떤걸해야|방법이|어떡|대처|대응)/.test(c)) return "how";
   return "default";
@@ -460,17 +463,20 @@ const instrumentalParticle = (word: string) => {
   return `${word}${jong <= 0 || jong === 8 ? "로" : "으로"}`;
 };
 
-/** verifyAnswer의 필수 조건(공식 확인 문구, 위험 시 중단·종료 문구)을 보장한다. */
-function ensureCompliant(body: string, verdict: ExpectedLabel): string {
-  let out = body.trim();
-  const missingAction = verdict !== "정상" && !/중단|종료|지급정지/.test(out);
-  const missingVerify = !/확인|대표번호/.test(out);
-  if (missingAction || missingVerify) {
-    out += verdict === "정상"
-      ? " 상대가 새로 송금이나 앱 설치를 요구하면 중단하고, 공식 대표번호로 사실을 확인하세요."
-      : " 지금은 통화를 종료하고 추가 송금·앱 설치를 중단한 뒤, 상대가 준 번호가 아닌 공식 대표번호로 사실을 확인하세요.";
-  }
-  return out;
+/**
+ * verifyAnswer의 필수 조건(공식 확인 문구, 위험 시 중단·종료 문구)을 보장한다.
+ * 판정은 **우리가 쓴 안내 문장**만 대상으로 한다. 인용문(citeClause) 안의 "재확인" 같은
+ * 단어가 조건을 만족시켜 정작 우리 CTA가 붙지 않는 형식적 통과를 막는다.
+ */
+function ensureCompliant(body: string, verdict: ExpectedLabel, quoted = ""): string {
+  const out = body.trim();
+  const ownText = quoted ? out.split(quoted).join(" ") : out;
+  const missingAction = verdict !== "정상" && !/중단|종료|지급정지|끊/.test(ownText);
+  const missingVerify = !/확인|대표번호/.test(ownText);
+  if (!missingAction && !missingVerify) return out;
+  return `${out}${verdict === "정상"
+    ? " 상대가 새로 송금이나 앱 설치를 요구하면 중단하고, 공식 대표번호로 사실을 확인하세요."
+    : " 지금은 통화를 종료하고 추가 송금·앱 설치를 중단한 뒤, 상대가 준 번호가 아닌 공식 대표번호로 사실을 확인하세요."}`;
 }
 
 /**
@@ -485,17 +491,26 @@ export function buildMockAnswer(
   anomaly?: TransactionAnomaly | null,
 ): string {
   const intent = detectMockIntent(userText);
+  const hasAnomaly = Boolean(anomaly?.evaluated && anomaly.signals.length > 0);
   const top = documents[0];
-  const citeClause = top ? ` ${topicParticle(top.authority)} "${firstSentence(top.content)}"라고 안내합니다.` : "";
+  // 거래 이상신호가 있는데 "정상 상담" 근거를 인용하면 미탐을 정당화하게 된다.
+  // 그 문서의 전제(고객이 먼저 시작·송금 요구 없음)가 이 상황에서 거짓이기 때문이다.
+  const suppressCite = hasAnomaly && result.verdict === "정상";
+  const citeClause = top && !suppressCite
+    ? ` ${topicParticle(top.authority)} "${firstSentence(top.content)}"라고 안내합니다.`
+    : "";
   const primaryEvidence = result.evidence.find((item) => !item.startsWith("정상성"));
   const evidencePhrase = primaryEvidence
     ? primaryEvidence.split(": ").slice(1).join(": ") || primaryEvidence
     : "복합 위험 신호";
-  const anomalyClause = anomaly?.evaluated && anomaly.signals.length > 0
-    ? ` 이번 이체에서는 '${anomaly.signals.slice(0, 2).map((signal) => signal.label).join("', '")}' 같은 평소와 다른 신호도 함께 잡혔습니다.`
+  const anomalyClause = hasAnomaly
+    ? ` 이번 이체에서는 '${anomaly!.signals.slice(0, 2).map((signal) => signal.label).join("', '")}' 같은 평소와 다른 신호도 함께 잡혔습니다.`
     : "";
 
-  if (intent === "victim" || /이미.*(송금|이체)|보냈|입금했/.test(userText)) {
+  // 피해 완료 표현은 넓게 잡는다. 과탐(정상 사용자가 골든타임 안내를 받음)은 안전한 방향이고,
+  // 미탐(실제 피해자가 "사기 징후 없음"을 듣는 것)은 되돌릴 수 없다.
+  const transferredPhrase = /이미.*(송금|이체)|보냈|보냈습니다|입금했|송금했|이체했|송금\s*완료|이체\s*완료|부쳤|넘겼|옮겼|건넸|인출했|출금했|불러줬|알려줬|눌렀/.test(userText);
+  if (intent === "victim" || transferredPhrase) {
     return "이미 이체하셨다면 지금은 시간이 가장 중요합니다. 추가 송금·앱 설치를 즉시 중단하세요. "
       + "이어서 해당 금융회사 콜센터에 지급정지를 요청하고, 1394에 신고·상담하고, 긴급할 때는 112에 신고하세요. "
       + "통화·문자·이체내역 증거를 그대로 보관하고, 절차는 각 기관 공식 대표번호로 확인하세요. "
@@ -524,20 +539,30 @@ export function buildMockAnswer(
       body = `이 통화를 ${instrumentalParticle(result.riskType)} 본 근거는 "${evidencePhrase}"입니다.${anomalyClause}${citeClause}`;
       break;
     case "how":
-      body = result.verdict === "정상"
-        ? "지금 급히 할 일은 없습니다. 상대가 송금이나 앱 설치를 요구하면 멈추고, 상담 내용은 공식 대표번호·앱에서 다시 확인하세요."
-        : "순서대로 하세요. 통화를 즉시 끊고, 추가 송금·앱 설치를 중단하고, 통화·문자·계좌 기록을 보관한 뒤, "
+      body = result.verdict !== "정상"
+        ? "순서대로 하세요. 통화를 즉시 끊고, 추가 송금·앱 설치를 중단하고, 통화·문자·계좌 기록을 보관한 뒤, "
           + "상대가 준 번호가 아닌 공식 대표번호로 사실을 확인하세요. 위험도가 높거나 이미 보냈다면 해당 금융회사 "
-          + "콜센터에 지급정지를 요청하고 1394에 상담하세요.";
+          + "콜센터에 지급정지를 요청하고 1394에 상담하세요."
+        : hasAnomaly
+          // 통화 탐지는 통과했지만 거래가 평소와 다르면 "할 일 없음"이라고 단정하면 안 된다.
+          ? `통화 문장만으로는 급한 신호를 찾지 못했습니다.${anomalyClause} 다만 이 이체는 평소 패턴과 달라 `
+            + "그대로 진행하지 마시고, 상대가 준 번호가 아닌 공식 대표번호로 먼저 확인하세요."
+          : "지금 문장만으로는 급한 조치가 필요해 보이지 않습니다. 상대가 송금이나 앱 설치를 요구하면 멈추고, "
+            + "상담 내용은 공식 대표번호·앱에서 다시 확인하세요.";
       break;
     default: {
       const evidenceTail = /신호$/.test(evidencePhrase) ? "가 확인됐습니다" : " 신호가 확인됐습니다";
-      body = result.verdict === "정상"
-        ? `현재 문장에서는 강한 사기 징후가 확인되지 않았습니다.${citeClause}`
-        : `현재 ${result.level} 단계입니다. ${evidencePhrase}${evidenceTail}.${anomalyClause}${citeClause}`;
+      body = result.verdict !== "정상"
+        ? `현재 ${result.level} 단계입니다. ${evidencePhrase}${evidenceTail}.${anomalyClause}${citeClause}`
+        : hasAnomaly
+          // 미탐 구간. 통화는 못 잡았어도 거래 신호는 반드시 고객 문장에 드러나야 한다.
+          ? `통화 문장만으로는 강한 사기 징후를 확인하지 못했습니다.${anomalyClause} `
+            + "통화 내용과 무관하게 이번 이체는 평소 패턴과 다릅니다. 진행 전에 상대가 준 번호가 아닌 "
+            + "공식 대표번호로 확인하시고, 확인 전에는 송금을 멈춰 주세요."
+          : `현재 문장에서는 강한 사기 징후가 확인되지 않았습니다.${citeClause}`;
     }
   }
-  return ensureCompliant(body, result.verdict);
+  return ensureCompliant(body, result.verdict, citeClause);
 }
 
 export function verifyAnswer(answer: string, result: DetectionResult): { passed: boolean; checks: string[] } {
