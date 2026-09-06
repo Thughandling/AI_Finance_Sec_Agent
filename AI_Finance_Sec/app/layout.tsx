@@ -22,8 +22,9 @@ export async function generateMetadata(): Promise<Metadata> {
   const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "localhost:3000";
   const protocol = requestHeaders.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
   const baseUrl = `${protocol}://${host}`;
-  const title = "AI_Finance_Sec | AI 금융 보안 비서";
-  const description = "이상금융거래 위험 신호를 실시간으로 탐지하고 대응을 안내하는 AI 금융 보안 비서 데모";
+  const title = "AI_Finance_Sec | 송금 전 마지막 판단을 돕는 AI 금융 보안 비서";
+  // "실시간 탐지" 같은 확정 표현을 쓰지 않는다. 합성 시나리오 기반 데모이며 오판 가능성이 있다.
+  const description = "송금 확인 단계에서 의심 통화와 평소와 다른 거래 신호를 함께 설명하는 합성 시나리오 데모. 규칙이 놓치는 미탐 사례도 함께 보여준다.";
 
   return {
     metadataBase: new URL(baseUrl), title, description,

@@ -311,7 +311,7 @@ export default function Home() {
   return (
     <main className="app-shell">
       <header className="topbar">
-        <div className="brand"><ShieldIcon /><div><strong>AI_Finance_Sec</strong><span>근거 기반 AI 금융 보안 비서</span></div></div>
+        <div className="brand"><ShieldIcon /><div><strong>AI_Finance_Sec</strong><span>송금 전 마지막 판단을 돕는 AI 금융 보안 비서</span></div></div>
         <button className="provider-button" onClick={() => setSettingsOpen(true)} aria-label="AI 모델 설정 열기">
           <span className={`provider-dot ${providerId}`} />
           <span><small>ACTIVE MODEL</small><strong>{provider.label}</strong></span>
@@ -333,8 +333,8 @@ export default function Home() {
       <section className="workspace">
         <aside className="sidebar">
           <div className="eyebrow">DEMO SCENARIOS · SYNTHETIC</div>
-          <h1>정상과 위험을<br />함께 검증합니다</h1>
-          <p className="intro">위험 사례만 보여주지 않고 Hard Negative를 포함해 오탐 가능성도 확인합니다.</p>
+          <h1>송금 직전,<br />왜 위험한지 설명합니다</h1>
+          <p className="intro">정탐만 보여주지 않습니다. 정상(Hard Negative)과 규칙이 놓치는 미탐 사례를 함께 실행해 한계까지 확인합니다.</p>
           <div className="scenario-list">
             {scenarios.map((item, index) => (
               <button key={item.id} className={`scenario-card ${selectedId === item.id ? "active" : ""}`} onClick={() => selectScenario(item.id)}>
@@ -348,10 +348,15 @@ export default function Home() {
             <span>{playing ? "Ⅱ" : "▶"}</span>{playing ? "분석 일시정지" : lineIndex >= scenario.lines.length - 1 ? "다시 분석하기" : "샘플 분석 시작"}
           </button>
           <div className="eval-summary">
-            <div><span>검증셋</span><strong>{evaluation.total}</strong></div>
-            <div><span>Macro F1</span><strong>{percent(evaluation.macroF1)}</strong></div>
-            <div><span>위험 Recall</span><strong>{percent(evaluation.recall)}</strong></div>
+            <div><span>회귀셋 {evaluation.total}건</span><strong>{percent(evaluation.macroF1)}</strong></div>
+            <div><span>독립 블라인드 40건</span><strong>40.5%</strong></div>
+            <div><span>기준일</span><strong>26.09.06</strong></div>
           </div>
+          {/* 회귀셋 성능을 일반화 성능으로 오해하지 않도록 한계를 같은 자리에 붙인다. */}
+          <p className="demo-note">
+            회귀셋 {evaluation.total}건은 이미 고친 실패의 재발만 검사합니다. 처음 보는 표현에서는
+            Macro F1 40.5%로 떨어지며, 4번 시나리오가 그 미탐을 그대로 재현합니다.
+          </p>
           <p className="demo-note">데모 전용 합성 데이터 · 실제 금융기관 조치 없음</p>
         </aside>
 

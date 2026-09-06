@@ -187,19 +187,40 @@ test("shows the current victim-response guidance without claiming external execu
   assert.match(page, /실제 신고는 수행되지 않습니다/);
 });
 
-test("returns the expected RAG Top1 for all four demo scenarios", async () => {
+test("returns the expected RAG Top1 for every demo scenario", async () => {
   const { analyzeText, retrieveAndRerank, scenarios } = await engine();
   const expected = {
     prosecutor: "FSS-ORG-001",
     loan: "FSS-LOAN-001",
     family: "KNPA-FAMILY-001",
+    // 완곡 표현 사칭은 통화 탐지가 실패해 정상 절차로 분류된다(의도된 미탐 시연).
+    evasive: "SAFE-NORMAL-001",
     normal: "SAFE-NORMAL-001",
   };
+  assert.equal(scenarios.length, Object.keys(expected).length, "expected 맵에 없는 시나리오가 있다");
   for (const scenario of scenarios) {
     const query = scenario.lines.map((line) => line.text).join(" ");
     const risk = analyzeText(query);
-    assert.equal(retrieveAndRerank(query, risk.riskType)[0].id, expected[scenario.id], scenario.id);
+    assert.equal(retrieveAndRerank(query, risk.riskType)[0]?.id, expected[scenario.id], scenario.id);
   }
+});
+
+test("keeps the known-limitation scenario an honest miss that transaction signals still catch", async () => {
+  const { analyzeText, detectTransactionAnomaly, planAlert, scenarios } = await engine();
+  const evasive = scenarios.find((scenario) => scenario.id === "evasive");
+  assert.ok(evasive, "evasive 시나리오가 있어야 한다");
+  assert.equal(evasive.expectedLabel, "사기");
+
+  const anomaly = detectTransactionAnomaly(evasive.transactionContext);
+  const transcript = evasive.lines.map((line) => line.text).join(" ");
+  const detection = analyzeText(transcript, anomaly.score);
+  // 통화 탐지는 실패해야 한다. 이 시나리오의 목적이 규칙 어휘 회피에 대한 한계 시연이다.
+  assert.equal(detection.verdict, "정상", "완곡 표현이 탐지되면 시연 의도가 사라진다");
+  // 그러나 백그라운드 거래 신호만으로 경보는 발동해야 한다(이중 트랙 방어).
+  assert.ok(anomaly.rawScore >= 30, `이상거래 rawScore ${anomaly.rawScore} < 30`);
+  const alert = planAlert(detection, anomaly);
+  assert.ok(alert.tier >= 2, `통화 미탐 시에도 경보 티어는 2 이상이어야 한다 (실제 ${alert.tier})`);
+  assert.ok(alert.suppressedChannels.includes("푸시 알림"), "통화 중 푸시는 억제되어야 한다");
 });
 
 test("keeps free chat risk independent from selected scenario transactions", async () => {
@@ -432,7 +453,9 @@ test("alert delivery never pushes during a call and never claims an executed ext
 
 test("scenario transaction contexts keep the fused score unchanged", async () => {
   const { scenarios, detectTransactionAnomaly } = await engine();
-  const expected = { prosecutor: 30, loan: 30, family: 30, normal: 0 };
+  // evasive는 통화 탐지가 실패하는 미탐 시나리오지만 거래 신호는 상한까지 차야 한다.
+  const expected = { prosecutor: 30, loan: 30, family: 30, evasive: 30, normal: 0 };
+  assert.equal(scenarios.length, Object.keys(expected).length, "expected 맵에 없는 시나리오가 있다");
   for (const scenario of scenarios) {
     assert.equal(detectTransactionAnomaly(scenario.transactionContext).score, expected[scenario.id], scenario.id);
   }

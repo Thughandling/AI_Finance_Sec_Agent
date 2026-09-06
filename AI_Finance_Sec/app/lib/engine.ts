@@ -135,6 +135,28 @@ export const scenarios: Scenario[] = [
     transactionContext: { amount: 20_000_000, payee: "ATM-CASH-0002", hour: 20, inCall: true, recentTransferCount: 2 },
   },
   {
+    // 알려진 한계를 데모에 그대로 노출한다. 1번 시나리오와 같은 기관사칭·계좌이동 요구지만
+    // 규칙 어휘("안전계좌", "이체")를 피한 완곡 표현이라 통화 탐지가 실패한다(미탐).
+    // 대신 백그라운드 이상거래가 단독으로 T2 경보를 만든다 — 이중 트랙 설계의 근거.
+    id: "evasive",
+    tag: "알려진 한계 · 미탐",
+    title: "완곡 표현 기관 사칭",
+    description: "1번과 같은 수법이지만 규칙 어휘를 피해 통화 탐지가 실패합니다.",
+    expectedLabel: "사기",
+    lines: [
+      { text: "안녕하세요, 고객님 계좌 관련해서 확인이 필요해 연락드렸습니다.", score: 8, keywords: ["확인 요청"], category: "접촉" },
+      { text: "저희 쪽에서 자금 흐름을 좀 봐야 하는 상황이에요.", score: 14, keywords: ["자금 흐름"], category: "완곡 표현" },
+      { text: "잠깐만 다른 데로 옮겨두시면 확인 끝나고 바로 돌려드립니다.", score: 22, keywords: ["다른 데로", "옮겨"], category: "우회 표현" },
+      { text: "오늘 안에 마무리돼야 해서요, 제가 도와드릴까요?", score: 28, keywords: ["오늘 안에"], category: "부드러운 압박" },
+    ],
+    transactionSignals: [
+      { label: "신규 수취인", value: "거래 이력 없음", risk: 10 },
+      { label: "이체 금액", value: "평소 대비 9배", risk: 12 },
+      { label: "통화 결합", value: "통화 중 이체", risk: 12 },
+    ],
+    transactionContext: { amount: 4_500_000, payee: "TOSS-8821-0455", hour: 20, inCall: true },
+  },
+  {
     id: "normal",
     tag: "Hard Negative",
     title: "정상 은행 상담",

@@ -25,9 +25,14 @@ test("renders the complete financial-safety demo", async () => {
 
   const html = await response.text();
   assert.match(html, /AI_Finance_Sec/);
-  assert.match(html, /근거 기반 AI 금융 보안 비서/);
+  // 첫 화면 문구는 기획서 첫 문장의 문제 정의와 같아야 한다(제출물 정합성).
+  assert.match(html, /송금 전 마지막 판단을 돕는 AI 금융 보안 비서/);
   assert.match(html, /SIMULATED DEMO FLOW/);
   assert.match(html, /Hard Negative/);
+  // 회귀셋 성능을 일반화 성능으로 오해시키지 않도록 한계를 같은 화면에 노출한다.
+  assert.match(html, /독립 블라인드/);
+  assert.match(html, /40\.5%/);
+  assert.match(html, /알려진 한계 · 미탐/);
   assert.match(html, /서버가 선택한 검색 근거/);
   assert.match(html, /규칙 기반 Safety 검사/);
   assert.match(html, /Mock/);
